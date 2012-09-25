@@ -61,11 +61,13 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
+
 #define PROGRAM_NAME "Barnyard"
 #define VER_MAJOR "2"
 #define VER_MINOR "2" 
 #define VER_REVISION "0"
 #define VER_BUILD "1"
+
 
 #define STD_BUF  1024
 
