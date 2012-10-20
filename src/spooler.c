@@ -24,44 +24,49 @@
 #include "config.h"
 #endif
 
-#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
+#include "plugbase.h"
+#include "pcap_pkthdr32.h"
+#include "spooler.h"
+#include "input-plugins/spi_unified2.h"
+#include "util.h"
+#include "unified2.h"
 #include "barnyard2.h"
 #include "debug.h"
-#include "plugbase.h"
-#include "spooler.h"
-#include "unified2.h"
-#include "util.h"
 
 #define CACHED_EVENTS_MAX 256
 
-/*
-** PRIVATE FUNCTIONS
-*/
-Spooler *spoolerOpen(const char *, const char *, uint32_t);
+int ProcessContinuous(InputConfig *);
+int ProcessContinuousWithWaldo(InputConfig *);
+int ProcessBatch(const char *, const char *);
+int ProcessWaldoFile(const char *);
+int spoolerReadWaldo(Waldo *);
+
+int spoolerOpen(Spooler *,const char *, const char *, uint32_t);
 int spoolerClose(Spooler *);
 int spoolerReadRecordHeader(Spooler *);
 int spoolerReadRecord(Spooler *);
-void spoolerProcessRecord(Spooler *, int);
+int spoolerProcessRecord(Spooler *,Waldo *, int);
 void spoolerFreeRecord(Record *record);
 
 int spoolerWriteWaldo(Waldo *, Spooler *);
-int spoolerOpenWaldo(Waldo *, uint8_t);
+int spoolerOpenWaldo(Waldo *);
 int spoolerCloseWaldo(Waldo *);
 
 
 int spoolerPacketCacheAdd(Spooler *, Packet *);
 int spoolerPacketCacheClear(Spooler *);
-
 int spoolerEventCachePush(Spooler *, uint32_t, void *);
+
 EventRecordNode * spoolerEventCacheGetByEventID(Spooler *, uint32_t);
 EventRecordNode * spoolerEventCacheGetHead(Spooler *);
 uint8_t spoolerEventCacheHeadUsed(Spooler *);
@@ -75,27 +80,29 @@ int spoolerEventCacheClean(Spooler *);
  * @retval -1   error
  * @retval 1    no file found
  *
- * Bugs:  This function presumes a 1 character delimeter between the base 
- * filename and the extension
+ * Possible Bugs:  This function assume a 1 character delimeter between the base 
+ *                 filename and the extension
  */
 static int FindNextExtension(const char *dirpath, const char *filebase, 
-        uint32_t timestamp, uint32_t *extension)
+        uint32_t timestamp, unsigned long *extension)
 {
-    DIR                 *dir = NULL;
-    struct dirent       *dir_entry;
-    size_t              filebase_len;
-    uint32_t            timestamp_min = 0;
-    char *endptr;
-
-    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,"Looking in %s %s\n", dirpath, filebase););
-
+    DIR *dir = NULL;
+    struct dirent *dir_entry;
+    
+    uint32_t timestamp_min = 0;    
+    size_t filebase_len;
+    
+    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,"Looking in %s for %s\n", dirpath, filebase););
+    
     /* peform sanity checks */
     if (dirpath == NULL || filebase == NULL)
+    {
         return SPOOLER_EXTENSION_EPARAM;
-
+    }
+	
     /* calculate filebase length */
     filebase_len = strlen(filebase);
-
+    
     /* open the directory */
     if ( !(dir=opendir(dirpath)) )
     {
@@ -103,165 +110,189 @@ static int FindNextExtension(const char *dirpath, const char *filebase,
                 strerror(errno));
         return SPOOLER_EXTENSION_EOPEN;
     }
-
+    
     /* step through each entry in the directory */
     while ( (dir_entry=readdir(dir)) )
     {
-        unsigned long   file_timestamp;
-
-        if (strncmp(filebase, dir_entry->d_name, filebase_len) != 0)
-            continue;
-
-        /* this is a file we may want */
-        file_timestamp = strtol(dir_entry->d_name + filebase_len + 1, &endptr, 10);
-        if ((errno == ERANGE) || (*endptr != '\0'))
-        {
-            LogMessage("WARNING: Can't extract timestamp extension from '%s'"
-                    "using base '%s'\n", dir_entry->d_name, filebase);
-
-            continue;
-        }
-
-        /* exact match */
-        if (timestamp != 0 && file_timestamp == timestamp)
-        {
-            timestamp_min = file_timestamp;
-            break;
-        }
-        /* possible overshoot */
-        else if (file_timestamp > timestamp)
-        {
-            /*  realign the minimum timestamp threshold */
-            if ( timestamp_min == 0 || (file_timestamp < timestamp_min) )
-                timestamp_min = file_timestamp;
-        }
+        unsigned long   file_timestamp = 0;
+	
+	if(dir_entry->d_type == DT_REG)
+	{
+	    if (strncmp(filebase, dir_entry->d_name, filebase_len) == 0)
+	    {
+		/* this is a file we may want */
+		file_timestamp = strtol(dir_entry->d_name + filebase_len+1, NULL, 10);
+		
+		if ((errno == ERANGE))
+		{
+		    LogMessage("WARNING: Can't extract timestamp extension from '%s'"
+			       "using base '%s'\n", 
+			       dir_entry->d_name, filebase);
+		    continue;
+		}
+		else
+		{
+		    /* exact match */
+		    if ( (timestamp != 0) && 
+			 (file_timestamp == timestamp))
+		    {
+			//timestamp_min = file_timestamp;
+			continue;//break;
+		    }
+		    /* possible overshoot */
+		    else if (file_timestamp > timestamp)
+		    {
+			/*  realign the minimum timestamp threshold */
+			if ( (timestamp_min == 0) || 
+			     (file_timestamp < timestamp_min) )
+			{
+			    timestamp_min = file_timestamp;
+			}
+		    }
+		}
+	    }
+	}
     }
-
+    
     closedir(dir);
-
+    
     /* no newer extensions were found */
     if (timestamp_min == 0) 
+    {
         return SPOOLER_EXTENSION_NONE;
+    }
 
-    /* update the extension variable if it exists */
-    if (extension != NULL)
-        *extension = timestamp_min;
-
+    if(extension != NULL)
+    {
+	*extension = timestamp_min;
+    }
+    
     return SPOOLER_EXTENSION_FOUND;
 }
 
-Spooler *spoolerOpen(const char *dirpath, const char *filename, uint32_t extension)
+int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint32_t extension)
 {
-    Spooler             *spooler = NULL;
-    int                 ret;
 
+    off_t read_size = 0;
+    
+    void *cache_ptr = NULL;
+    void *read_buffer_ptr = NULL;
+    
     /* perform sanity checks */
-    if ( filename == NULL )
-        return NULL;
-
-    /* create the spooler structure and allocate all memory */
-    spooler = (Spooler *)SnortAlloc(sizeof(Spooler));
-
-    /* allocate some extra structures required (ie. Packet) */
-
-    spooler->fd = -1;
+    if ( (spooler == NULL) || 
+	 (filename == NULL) ||
+	 (dirpath == NULL))
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    /* ELZ: We will need to have a cleaner way to do this :) */
+    cache_ptr =(void *)spooler->cacheHead;
+    read_buffer_ptr = (void *)spooler->read_buffer;
+    read_size = spooler->max_read_size;
+    
+    memset(spooler,'\0',sizeof(Spooler));
+    
+    spooler->cacheHead =(EventCacheLeaf *)cache_ptr;
+    spooler->read_buffer = (char *)read_buffer_ptr;
+    spooler->max_read_size = read_size;
+    /* ELZ: We will need to have a cleaner way to do this :) */
 
     /* build the full filepath */
+    /* need to check if we could be smarter about extension being 0 and filepath relation ...process batch kind of issue */
     if (extension == 0)
     {
-        ret = SnortSnprintf(spooler->filepath, MAX_FILEPATH_BUF, "%s", filename);
+        if( (SnortSnprintf(spooler->filepath, MAX_FILEPATH_BUF, "%s", 
+			   filename)) != SNORT_SNPRINTF_SUCCESS)
+	{
+	    spoolerClose(spooler);
+	    FatalError("spooler: filepath too long!\n");
+	}
     }
     else
     {
-        ret = SnortSnprintf(spooler->filepath, MAX_FILEPATH_BUF, "%s/%s.%u", dirpath, filename,
-                extension);
-    }
-
-    /* sanity check the filepath */
-    if (ret != SNORT_SNPRINTF_SUCCESS)
-    {
-        spoolerClose(spooler);
-        FatalError("spooler: filepath too long!\n");
+        if( (SnortSnprintf(spooler->filepath, MAX_FILEPATH_BUF, "%s/%s.%u", 
+			   dirpath, 
+			   filename,
+			   extension)) != SNORT_SNPRINTF_SUCCESS)
+	{
+	    spoolerClose(spooler);
+	    FatalError("spooler: filepath too long!\n");
+	}
     }
 
     spooler->timestamp = extension;
-
+    
     LogMessage("Opened spool file '%s'\n", spooler->filepath);
-
-    /* open the file non-blocking */
-    if ( (spooler->fd=open(spooler->filepath, O_RDONLY | O_NONBLOCK, 0)) == -1 )
+    
+    if ( (spooler->fd=open(spooler->filepath, O_RDONLY, 0)) == -1 )
     {
         LogMessage("ERROR: Unable to open log spool file '%s' (%s)\n", 
-                    spooler->filepath, strerror(errno));
+		   spooler->filepath, strerror(errno));
         spoolerClose(spooler);
-        spooler = NULL;
-        return NULL;
+	return 1;
     }
-
-    /* set state to initially be open */
-    spooler->state = SPOOLER_STATE_OPENED;
-
+    
+    if( fstat(spooler->fd,
+	      &spooler->spooler_stat) < 0)
+    {
+	LogMessage("ERROR: Unable to stat spool file '%s' (%s)\n", 
+		   spooler->filepath, strerror(errno));
+	spoolerClose(spooler);
+	return 1;
+    }
+    
+    spooler->file_size = spooler->spooler_stat.st_size;
+    
     spooler->ifn = GetInputPlugin("unified2");
 
     if (spooler->ifn == NULL)
     {
         spoolerClose(spooler);
-        spooler = NULL;
-        FatalError("ERROR: No suitable input plugin found!\n");
+	FatalError("ERROR: No suitable input plugin found!\n");
     }
 
-    return spooler;
+    return 0;
 }
 
 int spoolerClose(Spooler *spooler)
 {
     /* perform sanity checks */
     if (spooler == NULL)
-        return -1;
-
+    {
+        return 1;
+    }
+    
     LogMessage("Closing spool file '%s'. Read %d records\n",
                spooler->filepath, spooler->record_idx);
-
+    
     if (spooler->fd != -1)
+    {
         close(spooler->fd);
-
-    /* free record */
-    spoolerFreeRecord(&spooler->record);
-
-    free(spooler);
-    spooler = NULL;
-
+    }
+    
+    memset(spooler,'\0',sizeof(Spooler));
+    spooler->fd = -1;
+    
     return 0;
 }
 
 int spoolerReadRecordHeader(Spooler *spooler)
 {
-    int                 ret;
-
-    /* perform sanity checks */
     if ( spooler == NULL )
-        return -1;
-
-    if (spooler->state != SPOOLER_STATE_OPENED && spooler->state != SPOOLER_STATE_RECORD_READ)
     {
-        LogMessage("ERROR: Invalid attempt to read record header.\n");
-        return -1;
+        return 1;
     }
 
     if (spooler->ifn->readRecordHeader)
     { 
-        ret = spooler->ifn->readRecordHeader(spooler);
-
-        if (ret != 0)
-            return ret;
-
-        spooler->state = SPOOLER_STATE_HEADER_READ;
-        spooler->offset = 0;
+        return spooler->ifn->readRecordHeader(spooler);
     }
     else
     {
         LogMessage("WARNING: No function defined to read header.\n");
-        return -1;
+        return 1;
     }
 
     return 0;
@@ -301,16 +332,376 @@ int spoolerReadRecord(Spooler *spooler)
     return 0;
 }
 
+
+void *EventCacheGetEvent(EventCacheLeaf *eventHead,unsigned long event_id,unsigned long event_time,unsigned short trigger)
+{
+    unsigned long event_chunk_time = 0;
+    
+    if(eventHead == NULL)
+    {
+	return NULL;
+    }
+    
+    event_chunk_time = event_time / EVENT_CACHE_LEAF_TIMESPLIT ;
+    
+    while(eventHead != NULL)
+    {
+	if(eventHead->timeChunk == event_chunk_time)
+	{
+	    if(eventHead->eventArr[event_id] != NULL)
+	    {
+		if( eventHead->eventArr[event_id]->event_second == event_time)
+		{
+		    switch(trigger)
+		    {
+		    case TRIGGER_PACKET:
+			eventHead->eventArr[event_id]->event_trigger_packet++;
+			break;
+			
+		    case TRIGGER_EXTRA_DATA:
+			eventHead->eventArr[event_id]->event_trigger_extra_data++;
+			break;
+			
+		    default:
+			break;
+		    }
+		    
+		    return  (EventCacheNode *)(eventHead->eventArr[event_id])->event_buffer;
+		}
+		else if( (EventCacheNode *)(eventHead->eventArr[event_id])->mirror_event != NULL)
+		{
+		    EventCacheNode *subCacheNode = (EventCacheNode *)(eventHead->eventArr[event_id])->mirror_event;
+		    while(subCacheNode != NULL)
+		    {
+			if(subCacheNode->event_second == event_time)
+			{
+			    switch(trigger)
+			    {
+			    case TRIGGER_PACKET:
+				subCacheNode->event_trigger_packet++;
+				break;
+
+			    case TRIGGER_EXTRA_DATA:
+				subCacheNode->event_trigger_extra_data++;
+				break;
+
+			    default:
+				break;
+			    }
+
+			    
+			    return  subCacheNode->event_buffer;
+			}
+			subCacheNode = subCacheNode->mirror_event;
+		    }
+		}
+	    }
+	}
+	
+	eventHead = eventHead->next;
+    }
+    
+    return NULL;
+}
+
+unsigned int EventCacheDestroy(EventCacheLeaf **eventHead)
+{
+    EventCacheLeaf *currentLeaf = NULL;
+    EventCacheLeaf *nextLeaf = NULL;
+    EventCacheNode *cacheNode = NULL;
+
+    int x = 0;
+
+    if(eventHead == NULL)
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    currentLeaf = *eventHead;
+
+    while(currentLeaf != NULL)
+    {
+	for( x = 0 ; x < (USHRT_MAX + 1) ; x++)
+	{
+	sub_purge:
+	    if(currentLeaf->eventArr[x] != NULL)
+	    {
+		if(currentLeaf->eventArr[x]->event_buffer != NULL)
+		{
+		    free(currentLeaf->eventArr[x]->event_buffer);
+		    currentLeaf->eventArr[x]->event_buffer = NULL;
+		}
+		
+		cacheNode = currentLeaf->eventArr[x];
+		
+		if(currentLeaf->eventArr[x]->mirror_event != NULL)
+		{
+		    currentLeaf->eventArr[x] = currentLeaf->eventArr[x]->mirror_event;
+		    free(cacheNode);
+		    cacheNode = NULL;
+		    goto sub_purge;
+		}
+		
+		free(cacheNode);
+		cacheNode = NULL;
+	    }
+	}
+	
+	nextLeaf = currentLeaf->next;
+	free(currentLeaf);
+	currentLeaf = nextLeaf;
+    }
+    
+    *eventHead = NULL;
+    return 0;
+}
+
+unsigned int EventCacheClean(EventCacheLeaf **eventHead,unsigned long *last_cached_event_timestamp,unsigned long current_event_time)
+{
+    EventCacheLeaf *currentLeaf = NULL;
+    EventCacheLeaf *previousLeaf = NULL;
+    EventCacheLeaf *nextLeaf = NULL;
+    
+    int x = 0;
+
+    if( (last_cached_event_timestamp == NULL) || 
+	(*eventHead == NULL))
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    currentLeaf = *eventHead;
+    
+    while(currentLeaf != NULL)
+    {
+	if(currentLeaf->timeChunk <= (current_event_time / EVENT_CACHE_LEAF_TIMESPLIT))
+	{
+	    for( x = 0 ; x < (USHRT_MAX + 1) ; x++)
+	    {
+		
+	    sub_purge:
+		if(currentLeaf->eventArr[x] != NULL)
+		{
+		    if( (currentLeaf->eventArr[x])->event_second <= (current_event_time - TAG_PRUNE_TIME))
+		    {
+			EventCacheNode *subEvent = NULL;
+			
+			subEvent = currentLeaf->eventArr[x]->mirror_event;
+						
+			if(currentLeaf->eventArr[x]->event_buffer != NULL)
+			{
+			    free(currentLeaf->eventArr[x]->event_buffer);
+			}
+			
+			free(currentLeaf->eventArr[x]);
+			currentLeaf->eventArr[x] = subEvent;
+			currentLeaf->event_counter--;	
+			
+			if(subEvent != NULL)
+			{
+			    goto sub_purge;
+			}
+		    }
+		}
+	    }
+	}
+	
+	nextLeaf = currentLeaf->next;
+	
+	if(currentLeaf->event_counter == 0)
+	{
+	    free(currentLeaf);
+	    
+	    if(previousLeaf != NULL)
+	    {
+		previousLeaf->next = nextLeaf;
+	    }
+	    
+	    if(*eventHead == currentLeaf)
+	    {
+		*eventHead = nextLeaf;
+		currentLeaf = NULL;
+	    }
+	}
+	
+	previousLeaf = currentLeaf;
+	currentLeaf = nextLeaf;
+    }
+    
+    *last_cached_event_timestamp = current_event_time;
+
+    return 0;
+}
+				 
+unsigned int EventCacheEvent(EventCacheLeaf **eventHead,Unified2EventCommon *inputEvent,unsigned long  event_type,unsigned long event_length)
+{
+    
+    EventCacheLeaf *currentLeaf = NULL;
+    EventCacheNode *cacheNode = NULL;
+    
+    unsigned long unified2EventTime = 0;
+    unsigned long event_id = 0;
+    
+    if( (eventHead == NULL) ||
+	(inputEvent == NULL) ||
+	(event_length == 0 || event_length > MAX_UNIFIED2_EVENT_LENGTH))
+    {
+	return 1;
+    }
+    
+    /* This could be adjusted ... */
+    unified2EventTime = ntohl(inputEvent->event_second) / EVENT_CACHE_LEAF_TIMESPLIT;
+    
+    event_id = ntohl(inputEvent->event_id);
+    
+    currentLeaf = *eventHead;
+    
+    while(currentLeaf != NULL)
+    {
+	if(currentLeaf->timeChunk == unified2EventTime)
+	{
+	    if( (currentLeaf->eventArr[event_id] == NULL))
+	    {
+		if( (cacheNode =(EventCacheNode *)calloc(1,sizeof(EventCacheNode))) == NULL)
+		{
+		    /* XXX */
+		    return 1;
+		}
+		
+		if( (cacheNode->event_buffer = (void *)calloc(1,event_length)) == NULL)
+		{
+		    /* XXX */
+		    return 1;
+		}
+		
+		currentLeaf->eventArr[event_id] = cacheNode;
+		
+		cacheNode->event_id = event_id;
+		cacheNode->event_second = ntohl(inputEvent->event_second);
+		cacheNode->event_type = event_type;
+		cacheNode->event_length = event_length;
+		
+		memcpy(cacheNode->event_buffer,inputEvent,event_length);
+		
+		cacheNode->event_trigger_count++;
+		currentLeaf->event_counter++;
+		    
+		/* Break of loop */
+		return 0;
+	    }	       	     		
+	    else
+	    {
+		if( (currentLeaf->eventArr[event_id]->event_second == ntohl(inputEvent->event_second)) &&
+		    (currentLeaf->eventArr[event_id]->event_type) == event_type)
+		{
+		    currentLeaf->eventArr[event_id]->event_duplicata++;
+		    return 0;    
+		}
+		else
+		{
+		    EventCacheNode *subNode = currentLeaf->eventArr[event_id]->mirror_event;
+		    
+		    while(subNode != NULL)
+		    {
+			if( (subNode->event_second == ntohl(inputEvent->event_second)) &&
+			    (subNode->event_type == event_type))
+			{
+			    subNode->event_duplicata++;
+			    return 0;
+			}
+			
+			subNode = subNode->mirror_event;
+		    }
+		    
+		    LogMessage("Adding subnode original type[%u] time[%u]  NEW  type[%u] time[%u] \n",
+			       currentLeaf->eventArr[event_id]->event_type,
+			       currentLeaf->eventArr[event_id]->event_second,
+			       event_type,
+			       ntohl(inputEvent->event_second));
+		    
+		    if( (cacheNode =(EventCacheNode *)calloc(1,sizeof(EventCacheNode))) == NULL)
+		    {
+			/* XXX */
+			return 1;
+		    }
+		    
+		    if( (cacheNode->event_buffer = (void *)calloc(1,event_length)) == NULL)
+		    {
+			/* XXX */
+			return 1;
+		    }
+		    
+		    cacheNode->mirror_event = currentLeaf->eventArr[event_id]->mirror_event;
+		    currentLeaf->eventArr[event_id]->mirror_event = cacheNode;
+		    
+		    cacheNode->event_id = event_id;
+		    cacheNode->event_second = ntohl(inputEvent->event_second);
+		    cacheNode->event_type = event_type;
+		    cacheNode->event_length = event_length;
+		    
+		    memcpy(cacheNode->event_buffer,inputEvent,event_length);
+
+		    currentLeaf->event_counter++;
+		    return 0;
+		}
+	    }
+	}
+	
+	currentLeaf = currentLeaf->next;
+    }
+    
+    
+    if( (currentLeaf = (EventCacheLeaf *)calloc(1,sizeof(EventCacheLeaf))) == NULL)
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    currentLeaf->timeChunk = unified2EventTime;
+    
+    if( (cacheNode =(EventCacheNode *)calloc(1,sizeof(EventCacheNode))) == NULL)
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    if( (cacheNode->event_buffer = (void *)calloc(1,event_length)) == NULL)
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    currentLeaf->eventArr[event_id] = cacheNode;
+    
+    cacheNode->event_id = event_id;
+    cacheNode->event_second = ntohl(inputEvent->event_second);
+    cacheNode->event_type = event_type;
+    cacheNode->event_length = event_length;
+    
+    memcpy(cacheNode->event_buffer,inputEvent,event_length);
+    
+    cacheNode->event_trigger_count++;
+    currentLeaf->event_counter++;
+    
+    currentLeaf->next = *eventHead;
+    *eventHead = currentLeaf;
+    
+    return 0;
+}
+
 int ProcessBatch(const char *dirpath, const char *filename)
 {
     Spooler             *spooler = NULL;
     int                 ret = 0;
     int                 pb_ret = 0;
-
-    /* Open the spool file */
-    if ( (spooler=spoolerOpen("", filename, 0)) == NULL)
+    
+    
+    if( (dirpath == NULL) ||
+        (filename == NULL))
     {
-        FatalError("Unable to create spooler: %s\n", strerror(errno));
+	return 1;
     }
 
     while (exit_signal == 0 && pb_ret == 0)
@@ -339,7 +730,7 @@ int ProcessBatch(const char *dirpath, const char *filename)
                 if (ret == 0)
                 {
                     /* process record, firing output as required */
-                    spoolerProcessRecord(spooler, 1);
+                    spoolerProcessRecord(spooler,NULL ,1);
                 }
                 else if (ret == BARNYARD2_READ_EOF)
                 {
@@ -364,260 +755,487 @@ int ProcessBatch(const char *dirpath, const char *filename)
     return pb_ret;
 }
 
-/*
-** ProcessContinuous(const char *dirpath, const char *filebase, uint32_t record_start, time_t timestamp)
-**
-**
-**
-*/
-int ProcessContinuous(const char *dirpath, const char *filebase, 
-        uint32_t record_start, uint32_t timestamp)
+
+
+unsigned int spoolerProcessWork(Waldo *waldo,Spooler *spooler,off_t offset_target,unsigned short processing_context)
 {
-    Spooler             *spooler = NULL;
-    int                 ret = 0;
-    int                 pc_ret = 0;
-    int                 new_file_available = 0;
-    int                 waiting_logged = 0;
-    uint32_t            skipped = 0;
-    uint32_t            extension = 0;
-
-    u_int32_t waldo_timestamp = 0;
-    waldo_timestamp = timestamp; /* fix possible bug by keeping invocated timestamp at the time of the initial call */
+    Unified2RecordHeader    *recordHeader = NULL;
+    Unified2Packet          *pktptr = NULL;
     
-    if (BcProcessNewRecordsOnly())
+    Unified2EventCommon     *eventCommonPtr = NULL;
+    
+    Unified2ExtraDataHdr    *extraHeader = NULL;
+    Unified2ExtraData       *extraData = NULL;
+    
+    void *eventPtr = NULL;
+    
+    Packet decodePkt;
+    struct pcap_pkthdr pkth;
+    
+    int process_context = 0;
+    off_t process_offset = 0;
+    
+    
+    process_context = PROCESS_RECORD_HEADER;
+    
+    while(spooler->current_process_offset < offset_target)
     {
-        LogMessage("Processing new records only.\n");
-
-        /* Find newest file extension */
-        while (FindNextExtension(dirpath, filebase, timestamp, &extension) == 0)
-        {
-            if (timestamp > 0 && BcLogVerbose())
-                LogMessage("Skipping file: %s/%s.%u\n", dirpath,
-                        filebase, timestamp);
-
-            timestamp = extension + 1;
-        }
-
-        timestamp = extension;
-    }
-
-    /* Start the main process loop */
-    while (exit_signal == 0)
-    {
-        /* no spooler exists so let's create one */
-        if (spooler == NULL)
-        {
-            /* find the next file to spool */
-            ret = FindNextExtension(dirpath, filebase, timestamp, &extension);
-
-	    /* The file found is not the same as specified in the waldo,
-               thus we need to reset record_start, since we are obviously not processing the same file*/
-            if(waldo_timestamp != extension)
-            {
-                record_start = 0; /* There is no danger to resetting record_start to 0
-                                     if called timestamp is not the same */
-            }
-
-
-            /* no new extensions found */
-            if (ret == SPOOLER_EXTENSION_NONE)
-            {
-                if (waiting_logged == 0)
-                {
-                    if (BcProcessNewRecordsOnly())
-                       LogMessage("Skipped %u old records\n", skipped);
-
-                    LogMessage("Waiting for new spool file\n");
-                    waiting_logged = 1;
-                    barnyard2_conf->process_new_records_only_flag = 0;
-                }
-
-                sleep(1);
-                continue;
-            }
-            /* an error occured whilst looking for new extensions */
-            else if (ret != SPOOLER_EXTENSION_FOUND)
-            {
-                LogMessage("ERROR: Unable to find the next spool file!\n");
-                exit_signal = -1;
-                pc_ret = -1;
-                continue;
-            }
-	    
-            /* found a new extension so create a new spooler */
-            if ( (spooler=spoolerOpen(dirpath, filebase, extension)) == NULL )
-            {
-                LogMessage("ERROR: Unable to create spooler!\n");
-                exit_signal = -1;
-                pc_ret = -1;
-		continue;
-            }
-	    else
+	
+    spooler_rebuffer:	
+	// Enable for debug mabey.
+	//LogMessage("[%s()]: Fast Forwarding to [%u] \n",
+	//	   __FUNCTION__,
+	//	   waldo->data.last_processed_offset);
+	
+	if( (spooler->ifn->readBulk(spooler)))
+	{
+	    /* XXX */
+	    return 1;
+	}
+	
+	process_offset = 0;
+	
+	while(process_offset < spooler->current_read_size)
+	{
+	    switch(process_context)
 	    {
-		/* Make sure we create a new waldo even if we did not have processed an event */
-		spooler->record_idx = 0;    
-		spoolerWriteWaldo(&barnyard2_conf->waldo, spooler);
-			    
-		waiting_logged = 0;
+	    case PROCESS_RECORD_HEADER:
 		
-		/* set timestamp to ensure we look for a newer file next time */
-		timestamp = extension + 1;
-	    }
-	    
-            continue;
-        }
+		recordHeader = (Unified2RecordHeader *)(spooler->read_buffer+process_offset);
+		
+		if((process_offset + sizeof(Unified2RecordHeader) > spooler->current_read_size))
+		{
+		    
+		    spooler->current_process_offset += process_offset;
+		    if( processing_context == SPOOLER_PROCESS_NORMAL)
+		    {
+			waldo->data.last_processed_offset = spooler->current_process_offset;
+		    }
+		    
+		    spooler->last_read_offset = spooler->current_process_offset;
+		    
+		    eventPtr = NULL;
+		    pktptr = NULL;
+		    memset(&pkth,'\0',sizeof(struct pcap_pkthdr));
+		    process_context = PROCESS_RECORD_HEADER;
 
-        /* act according to current spooler state */
-        switch(spooler->state)
-        {
-            case SPOOLER_STATE_OPENED:
-            case SPOOLER_STATE_RECORD_READ:
-                ret = spoolerReadRecordHeader(spooler);
-                break;
+		    if( processing_context == SPOOLER_PROCESS_NORMAL)
+		    {
+			spoolerWriteWaldo(waldo,spooler);
+		    }
+		    
+		    lseek(spooler->fd,spooler->last_read_offset,SEEK_SET);
+		    goto spooler_rebuffer;
+		    
+		}
+		else if( (process_offset + sizeof(Unified2RecordHeader) +  ntohl(recordHeader->length)) > spooler->current_read_size )
+		{
+		    spooler->current_process_offset += process_offset;
 
-            case SPOOLER_STATE_HEADER_READ:
-                ret = spoolerReadRecord(spooler);
-                break;
-
-            default:
-                LogMessage("ERROR: Invalid spooler state (%i). Closing '%s'\n",
-                            spooler->state, spooler->filepath);
-
-#ifndef WIN32
-                /* archive the spool file */
-                if (BcArchiveDir() != NULL)
-                    ArchiveFile(spooler->filepath, BcArchiveDir());
-#endif
-
-                /* we've finished with the spooler so destroy and cleanup */
-                spoolerClose(spooler);
-                spooler = NULL;
-
-                record_start = 0;
-                break;
-        }
-
-        /* if no spooler exists, we are waiting for a newer file to arrive */
-        if (spooler == NULL)
-            continue;
-
-        if (ret == 0)
-        {
-            /* check for a successful record read */
-            if (spooler->state == SPOOLER_STATE_RECORD_READ)
-            {
-                if (record_start > 0)
-                {
-                    /* skip this record */
-                    record_start--;
-                    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,"Skipping due to record start offset (%lu)...\n",
-                                 (long unsigned)record_start););
-
-                    /* process record to ensure correlation context, but DO NOT fire output*/
-                    spoolerProcessRecord(spooler, 0);
-                }
-                else if (BcProcessNewRecordsOnly())
-                {
-                    /* skip this record */
-                    skipped++;
-                    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,"Skipping due to new records only flag...\n"););
-
-                    /* process record to ensure correlation context, but DO NOT fire output*/
-                    spoolerProcessRecord(spooler, 0);
-                }
-                else
-                {
-                    /* process record, firing output as required */
-                    spoolerProcessRecord(spooler, 1);
-                }
-            }
-
-            spoolerFreeRecord(&spooler->record);
-        }
-        else if (ret == BARNYARD2_FILE_ERROR)
-        {
-            LogMessage("ERROR: Reading current file!\n");
-            exit_signal = -3;
-            pc_ret = -1;
-            continue;
-        }
-        else
-        {
-            if (new_file_available)
-            {
-                switch(spooler->state)
-                {
-                    case SPOOLER_STATE_OPENED:
-                    case SPOOLER_STATE_HEADER_READ:
-                    case SPOOLER_STATE_RECORD_READ:
-                        if (ret == BARNYARD2_ETRUNC)
-                            LogMessage("Truncated record in '%s'\n", spooler->filepath);
-                        break;
-
-                    default:
-                        if (ret == BARNYARD2_READ_PARTIAL)
-                            LogMessage("Partial read from '%s'\n",
-                                    spooler->filepath);
-                        break;
-                }
-
-                /* archive the file */
-                if (BcArchiveDir() != NULL)
-                    ArchiveFile(spooler->filepath, BcArchiveDir());
-
-                /* close (ie. destroy and cleanup) the spooler so we can rotate */
-                spoolerClose(spooler);
-                spooler = NULL;
-
-                record_start = 0;
-                new_file_available = 0;
-            }
-            else
-            {
-                ret = FindNextExtension(dirpath, filebase, timestamp, NULL);
-                if (ret == 0)
-                {
-                    new_file_available = 1;
-                }
-                else if (ret == -1)
-                {
-                    LogMessage("ERROR: Looking for next spool file!\n");
-                    exit_signal = -3;
-                    pc_ret = -1;
-                }
-                else
-                {
-                    if (!waiting_logged) 
+		    if( processing_context == SPOOLER_PROCESS_NORMAL)
                     {
-                        if (BcProcessNewRecordsOnly())
-                            LogMessage("Skipped %u old records\n", skipped);
+			waldo->data.last_processed_offset = spooler->current_process_offset;
+		    }
 
-                        LogMessage("Waiting for new data\n");
-                        waiting_logged = 1;
-                        barnyard2_conf->process_new_records_only_flag = 0;
-                    }
+		    spooler->last_read_offset = spooler->current_process_offset;
+		    
+		    eventPtr = NULL;
+		    pktptr = NULL;
+		    memset(&pkth,'\0',sizeof(struct pcap_pkthdr));
+		    process_context = PROCESS_RECORD_HEADER;
 
-                    sleep(1);
-                    continue;
-                }
-            }
-        }
+		    if( processing_context == SPOOLER_PROCESS_NORMAL)
+                    {
+			spoolerWriteWaldo(waldo,spooler);
+		    }
+		    
+		    lseek(spooler->fd,spooler->last_read_offset,SEEK_SET);
+		    goto spooler_rebuffer;
+		}
+		
+		pc.total_records++;
+		process_context = PROCESS_RECORD;
+		break;
+		
+	    case PROCESS_RECORD:
+		
+		switch(ntohl(recordHeader->type))
+		{
+		    
+		case UNIFIED2_IDS_EVENT:
+		case UNIFIED2_IDS_EVENT_IPV6:
+		case UNIFIED2_IDS_EVENT_VLAN:
+		case UNIFIED2_IDS_EVENT_MPLS:
+		case UNIFIED2_IDS_EVENT_IPV6_MPLS:
+		case UNIFIED2_IDS_EVENT_IPV6_VLAN:
+
+		    eventCommonPtr = (Unified2EventCommon *)(spooler->read_buffer + process_offset + sizeof(Unified2RecordHeader));
+
+		    if( (spooler->current_process_offset == 0) &&
+			(ntohl(eventCommonPtr->event_id) == 1))
+		    {
+			LogMessage("INFO: Destroying [Event cache], detected a unified2 engine re-initialization state \n");
+			if( EventCacheDestroy(&spooler->cacheHead))
+			{
+			    /* XXX */
+			    LogMessage("EventCacheDestroy Failed ...\n");
+			    return 1;
+			}
+		    }
+		       
+		    
+		    if( EventCacheEvent(&spooler->cacheHead,eventCommonPtr, ntohl(recordHeader->type),ntohl(recordHeader->length)))
+		    {
+			LogMessage("EventCacheEvent call failed ... \n");
+			return 1;
+		    }
+
+		    if(spooler->last_cache_event == 0)
+		    {
+			spooler->last_cache_event = ntohl(eventCommonPtr->event_second);
+		    }
+		    
+		    if( (spooler->last_cache_event > 0) &&
+			(ntohl(eventCommonPtr->event_second) > spooler->last_cache_event) &&
+			((ntohl(eventCommonPtr->event_second) - spooler->last_cache_event) >= TAG_PRUNE_TIME))
+		    {
+			if( (EventCacheClean(&spooler->cacheHead,&spooler->last_cache_event,ntohl(eventCommonPtr->event_second))))
+			{
+			    /* XXX */
+			    LogMessage("EventCacheClean failed \n");
+			}
+		    }
+		    
+		    pc.total_events++;
+		    break;
+		    
+		case UNIFIED2_PACKET:
+		    pc.total_packets++;
+		    
+		    pktptr = (Unified2Packet *)(spooler->read_buffer + process_offset + sizeof(Unified2RecordHeader));
+		    
+		    pkth.ts.tv_sec = ntohl(pktptr->packet_second);
+                    pkth.ts.tv_usec = ntohl(pktptr->packet_microsecond);
+                    pkth.len = ntohl(pktptr->packet_length);
+                    pkth.caplen = pkth.len;
+		    
+                    DecodePacket(ntohl(pktptr->linktype),
+                                 &decodePkt,
+                                 &pkth,
+                                 pktptr->packet_data);
+
+		    if( processing_context == SPOOLER_PROCESS_NORMAL)
+                    {
+			eventPtr = EventCacheGetEvent(spooler->cacheHead,ntohl(pktptr->event_id),ntohl(pktptr->event_second),TRIGGER_PACKET);
+			
+			if( (eventPtr != NULL) &&
+			    (pktptr != NULL))
+			{
+			    CallOutputPlugins(OUTPUT_TYPE__SPECIAL,&decodePkt,eventPtr,UNIFIED2_IDS_EVENT);
+			}
+			else
+			{
+			    LogMessage("Orphan packet \n");
+			}
+		    }
+		    
+		    break;
+		    
+		case UNIFIED2_EXTRA_DATA:
+		    LogMessage("Unread event [%u] \n",
+			       ntohl(recordHeader->type));
+		    break;
+
+		default:
+		    LogMessage("[%s()]: Unsupported event type -> [%u] of length[%u] current_process_offset[%u] process_offset[%u]\n",
+			       __FUNCTION__,
+			       ntohl(recordHeader->type),
+			       ntohl(recordHeader->length),
+			       spooler->current_process_offset,
+			       process_offset);
+		    return 1;
+		    break;
+		}
+		process_offset += (sizeof(Unified2RecordHeader) + ntohl(recordHeader->length));
+		process_context = PROCESS_RECORD_HEADER;
+		spooler->record_idx++;
+
+		if( processing_context == SPOOLER_PROCESS_NORMAL)
+		{
+		    waldo->data.last_processed_offset = spooler->current_process_offset +  process_offset;
+		    spoolerWriteWaldo(waldo,spooler);
+		}
+		
+		break;
+		
+	    default:
+		FatalError("Unknown spooler state \n");
+		break;
+	    }
+	}
+	
+	spooler->current_process_offset += spooler->current_read_size;
     }
-
-    /* close waldo if appropriate */
-    if(barnyard2_conf)
-	spoolerCloseWaldo(&barnyard2_conf->waldo);
-
-    return pc_ret;
+    
+    return 0;
 }
 
-int ProcessContinuousWithWaldo(Waldo *waldo)
-{
-    if (waldo == NULL)
-        return -1;
 
-    return ProcessContinuous(waldo->data.spool_dir, waldo->data.spool_filebase,
-                             waldo->data.record_idx, waldo->data.timestamp);
+unsigned int spoolerProcess(Waldo *waldo,Spooler *spooler)
+{
+    if( (waldo == NULL) ||
+	(spooler == NULL))
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    /* Check Fd's. */
+    if( (spooler->fd < 0) ||
+	(waldo->fd < 0))
+    {
+	/* XXX */
+	return 1;
+    }
+    
+spoolerProcess_reevaluate_context:
+    if( spooler->current_process_offset < waldo->data.last_processed_offset)
+    {
+	/* Fast FORWARD */
+	if( spoolerProcessWork(waldo,spooler,
+			       waldo->data.last_processed_offset,
+			       SPOOLER_PROCESS_FASTFORWARD))
+	{
+	    /* XXX */
+	    return 1;
+	}
+
+	/* We did fast forward in context, so reset info */
+	if(waldo->data.last_processed_offset)
+	{
+	    memset(spooler->read_buffer,'\0',spooler->current_read_size);
+	    
+	    if( (lseek(spooler->fd,spooler->current_process_offset,SEEK_SET)) < 0)
+	    {
+		LogMessage("ERROR: Unable to seek spool file '%s' (%s)\n",
+			   spooler->filepath, strerror(errno));
+		return 1;
+	    }
+	    
+	    spooler->last_read_offset = spooler->current_process_offset;
+	}
+
+	goto spoolerProcess_reevaluate_context;
+    }
+    else if( spooler->last_read_offset < spooler->spooler_stat.st_size)
+    {
+	
+	if( spoolerProcessWork(waldo,spooler,
+			       spooler->spooler_stat.st_size,
+			       SPOOLER_PROCESS_NORMAL))
+	{
+	    /* XXX */
+	    return 1;
+	}
+    }
+    
+    return 0;
+}
+
+/*
+** ProcessContinuous(InputConfig *iContext)
+**
+*/
+int ProcessContinuous(InputConfig *iContext)
+{
+    unsigned long extension = 0;
+
+    unsigned long last_record_count = 0;
+
+    time_t last_print_time = 0;
+    time_t current_time = 0;
+
+
+
+    Spooler *spooler = NULL;
+    Waldo *waldo = NULL;
+    
+    if(iContext == NULL)
+    {
+	/* XXX */
+	return 1;
+    }
+    
+    /* Set context */
+    spooler = &((Unified2InputPluginContext *)iContext->context)->spooler;
+    waldo  = &((Unified2InputPluginContext *)iContext->context)->waldo;
+    spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
+    spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
+    
+    while(exit_signal == 0)
+    {
+	/* Could have other uses? */
+	current_time = time(NULL);
+	
+	/* General entry block when we start */
+	
+	if( (waldo->data.timestamp != 0) &&
+	    (spooler->fd <= 0))
+	{
+	    /* Open last recorded spool file */
+	    if( (spoolerOpen(spooler,
+			     waldo->data.spool_dir,
+			     waldo->data.spool_filebase,
+			     waldo->data.timestamp)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	    
+	    if(fstat(spooler->fd,
+		     &spooler->spooler_stat))
+	    {
+		LogMessage("ERROR: Unable to stat spool file '%s' (%s)\n",
+			   spooler->filepath, strerror(errno));
+		return 1;
+	    }
+	    
+	    if( (spoolerProcess(waldo,spooler)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	    
+	}
+	/* 
+	   Checking current file, if size changed since last loop, 
+	   process, else look for new file 
+	*/
+	else if( (waldo->data.timestamp != 0) && 
+		 (spooler->fd > 0))
+	{
+	    
+	    if(fstat(spooler->fd,
+		     &spooler->spooler_stat))
+	    {
+		LogMessage("ERROR: Unable to stat spool file '%s' (%s)\n",
+			   spooler->filepath, strerror(errno));
+		return 1;
+	    }
+	    
+	    if((spooler->spooler_stat.st_size == spooler->last_read_offset))
+	    {
+		if( FindNextExtension(waldo->data.spool_dir,
+				      waldo->data.spool_filebase,
+				      waldo->data.timestamp,
+				      &extension))
+		{
+		    sleep(1);
+		    if( (current_time - last_print_time) > SPOOLER_PRINT_DELAY)
+		    {
+			last_print_time = current_time;
+			LogMessage("Waiting for new data in [%s/%s.%u] or a new unified2 file in [%s/] processed record delta [%u]\n",
+				   waldo->data.spool_dir, 
+				   waldo->data.spool_filebase,
+				   waldo->data.timestamp,
+				   waldo->data.spool_dir,
+			           (spooler->record_idx - last_record_count));
+			
+			last_record_count = spooler->record_idx;
+		    }
+		    continue;
+		}
+		
+		waldo->data.timestamp = extension;		
+		spooler->record_idx = 0;
+		waldo->data.last_processed_offset = 0;
+		last_record_count = 0;
+		
+		if( (spoolerOpen(spooler,
+				 waldo->data.spool_dir,
+				 waldo->data.spool_filebase,
+				 waldo->data.timestamp)))
+		{
+		    /* XXX */
+		    return 1;
+		}
+		
+		spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
+		spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
+		
+		if( (spoolerWriteWaldo(waldo, spooler)))
+		{
+		    /* XXX */
+		    return 1;
+		}
+	    }
+	    /* This is where the actual processing occur or data was appended. */
+	    else
+	    {
+		spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
+		spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
+		
+		if( (spoolerProcess(waldo,spooler)))
+		{
+		    /* XXX */
+		    return 1;
+		}
+	    }
+	}
+	/* We have no file */
+	else
+	{
+	    if( FindNextExtension(waldo->data.spool_dir,
+				  waldo->data.spool_filebase,
+				  waldo->data.timestamp,
+				  &extension))
+	    {
+		sleep(1);
+		if( (current_time - last_print_time) > SPOOLER_PRINT_DELAY)
+		{
+		    last_print_time = current_time;
+		    LogMessage("Waiting for a valid unified2 file in [%s/] \n",
+			       waldo->data.spool_dir);
+		    continue;
+		}
+	    }
+	    
+	    waldo->data.timestamp = extension;
+	    spooler->record_idx = 0;
+	    waldo->data.last_processed_offset = 0;
+
+	    if( (spoolerOpen(spooler,
+			     waldo->data.spool_dir,
+			     waldo->data.spool_filebase,
+			     waldo->data.timestamp)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	    
+	    spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
+	    spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
+	    
+	    if( (spoolerWriteWaldo(waldo, spooler)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	    
+	}
+    }
+    
+    spoolerCloseWaldo(waldo);
+    return 0;
+}
+
+
+int ProcessContinuousWithWaldo(InputConfig *iContext)
+{
+    if (iContext == NULL)
+        return -1;
+    
+    return ProcessContinuous(iContext);
 }
 
 
@@ -625,7 +1243,7 @@ int ProcessContinuousWithWaldo(Waldo *waldo)
 ** RECORD PROCESSING EVENTS
 */
 
-void spoolerProcessRecord(Spooler *spooler, int fire_output)
+int spoolerProcessRecord(Spooler *spooler,Waldo *waldo, int fire_output)
 {
     struct pcap_pkthdr      pkth;
     uint32_t                type;
@@ -633,24 +1251,24 @@ void spoolerProcessRecord(Spooler *spooler, int fire_output)
 
     /* convert type once */
     type = ntohl(((Unified2RecordHeader *)spooler->record.header)->type);
-
     /* increment the stats */
     pc.total_records++;
+    
     switch (type)
     {
-        case UNIFIED2_PACKET:
-            pc.total_packets++;
-            break;
-        case UNIFIED2_IDS_EVENT:
-        case UNIFIED2_IDS_EVENT_IPV6:
-        case UNIFIED2_IDS_EVENT_MPLS:
-        case UNIFIED2_IDS_EVENT_IPV6_MPLS:
-        case UNIFIED2_IDS_EVENT_VLAN:
-        case UNIFIED2_IDS_EVENT_IPV6_VLAN:
-            pc.total_events++;
-            break;
-        default:
-            pc.total_unknown++;
+    case UNIFIED2_PACKET:
+	pc.total_packets++;
+	break;
+    case UNIFIED2_IDS_EVENT:
+    case UNIFIED2_IDS_EVENT_IPV6:
+    case UNIFIED2_IDS_EVENT_MPLS:
+    case UNIFIED2_IDS_EVENT_IPV6_MPLS:
+    case UNIFIED2_IDS_EVENT_VLAN:
+    case UNIFIED2_IDS_EVENT_IPV6_VLAN:
+	pc.total_events++;
+	break;
+    default:
+	pc.total_unknown++;
     }
 
     /* check if it's packet */
@@ -739,8 +1357,15 @@ void spoolerProcessRecord(Spooler *spooler, int fire_output)
         spooler->record.pkt = NULL;
 
         /* waldo operations occur after the output plugins are called */
-        if (fire_output)
-            spoolerWriteWaldo(&barnyard2_conf->waldo, spooler);
+        if ( (fire_output) &&
+	     (waldo != NULL))
+	{
+            if( (spoolerWriteWaldo(waldo, spooler)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	}
     }
     /* check if it's an event of known sorts */
     else if(type == UNIFIED2_IDS_EVENT || type == UNIFIED2_IDS_EVENT_IPV6 ||
@@ -770,14 +1395,28 @@ void spoolerProcessRecord(Spooler *spooler, int fire_output)
         spooler->record.data = NULL;
 
         /* waldo operations occur after the output plugins are called */
-        if (fire_output)
-            spoolerWriteWaldo(&barnyard2_conf->waldo, spooler);
+        if((fire_output) &&
+	   waldo != NULL)
+	{
+            if( (spoolerWriteWaldo(waldo, spooler)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	}
     }
     else if (type == UNIFIED2_EXTRA_DATA)
     {
         /* waldo operations occur after the output plugins are called */
-        if (fire_output)
-            spoolerWriteWaldo(&barnyard2_conf->waldo, spooler);
+        if((fire_output) &&
+	   (waldo != NULL))
+	{
+            if( (spoolerWriteWaldo(waldo, spooler)))
+	    {
+		/* XXX */
+		return 1;
+	    }
+	}
     }
     else
     {
@@ -796,13 +1435,21 @@ void spoolerProcessRecord(Spooler *spooler, int fire_output)
                               ernCache->type);
 
             /* waldo operations occur after the output plugins are called */
-            if (fire_output)
-                spoolerWriteWaldo(&barnyard2_conf->waldo, spooler); 
+            if( (fire_output) && 
+		(waldo != NULL))
+	    {
+                if( (spoolerWriteWaldo(waldo, spooler)))
+		{
+		    /* XXX */
+		    return 1;
+		}
+	    }
         }
     }
-
+    
     /* clean the cache out */
     spoolerEventCacheClean(spooler);
+    return 0;
 }
 
 int spoolerEventCachePush(Spooler *spooler, uint32_t type, void *data)
@@ -916,16 +1563,16 @@ int spoolerEventCacheClean(Spooler *spooler)
     return 0;
 }
 
-
 void spoolerFreeRecord(Record *record)
 {
     if (record->data)
     {
         free(record->data);
     }
-
+    
     record->data = NULL;
 }
+
 
 /*
 ** WALDO FILE OPERATIONS
@@ -937,51 +1584,59 @@ void spoolerFreeRecord(Record *record)
 ** Description:
 **   Open the waldo file, non-blocking, defined in the Waldo structure
 */
-int spoolerOpenWaldo(Waldo *waldo, uint8_t mode)
+int spoolerOpenWaldo(Waldo *waldo)
 {
+
+    Spooler mockSpooler = {0}; /* Only used if we create a new waldo file */
     struct stat         waldo_info;
     int                 waldo_file_flags = 0;
     mode_t              waldo_file_mode = 0;
-    int                 ret = 0;
-
+    
+    if( (waldo == NULL) )
+    {
+	/* XXX */
+	return 1;
+    }
+    
     /* check if waldo file is already open and in the correct mode */
-    if ( (waldo->state & WALDO_STATE_OPEN) && (waldo->fd != -1) && (waldo->mode == mode) )
+    if( !(waldo->state & WALDO_STATE_ENABLED))
     {
-        return WALDO_FILE_SUCCESS;
+	return WALDO_FILE_SUCCESS;
     }
-
-    /* check that a waldo file has been specified */
-    if ( waldo->filepath == NULL )
-    {
-        return WALDO_FILE_EEXIST;
-    }
-
+    
     /* stat the file to see it exists */
-    ret = stat(waldo->filepath, &waldo_info);
-
-    if ( mode == WALDO_MODE_READ )
-        waldo_file_flags = ( O_RDONLY );
-    else if ( mode == WALDO_MODE_WRITE )
+    if( (stat(waldo->filepath, &waldo_info)))
     {
-        waldo_file_flags = ( O_CREAT | O_WRONLY );
-        waldo_file_mode = ( S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ) ;
+	/* XXX */
+        LogMessage("WARNING: Unable to stat waldo file '%s' (%s)\n", waldo->filepath,
+		   strerror(errno));
+	
+	waldo_file_flags = ( O_CREAT | O_RDWR );	
     }
-
-    /* open the file non-blocking */
-    if ( (waldo->fd=open(waldo->filepath, waldo_file_flags, waldo_file_mode)) == -1 )
+    else
+    {
+	waldo_file_flags = ( O_RDWR );
+    }
+    
+    waldo_file_mode = ( S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ) ;
+    
+    if ( (waldo->fd=open(waldo->filepath, waldo_file_flags, waldo_file_mode)) < 0)
     {
         LogMessage("WARNING: Unable to open waldo file '%s' (%s)\n", waldo->filepath,
-                    strerror(errno));
+		   strerror(errno));
         return WALDO_FILE_EOPEN;
     }
+    
+    if(waldo_file_flags & O_CREAT)
+    {
+	if( spoolerWriteWaldo(waldo,&mockSpooler))
+	{
+	    /* XXX */
+	    return 1;
+	}
+    }
 
-    if ( ret != 0 )
-        return WALDO_FILE_EEXIST;
-
-    /* set waldo state and mode */
-    waldo->state |= WALDO_STATE_OPEN;
-    waldo->mode = mode;
-
+    
     return WALDO_FILE_SUCCESS;
 }
 
@@ -994,20 +1649,19 @@ int spoolerOpenWaldo(Waldo *waldo, uint8_t mode)
 */
 int spoolerCloseWaldo(Waldo *waldo)
 {
-
-    /* check we have a valid file descriptor */
-    if (waldo->state & WALDO_STATE_OPEN)
-        return WALDO_FILE_EOPEN;
+    if(waldo == NULL)
+    {
+	return 1;
+    }
     
     /* close the file */
-    close(waldo->fd);
-    waldo->fd = -1;
-
-    /* reset open state and mode */
-    waldo->state &= ( ~WALDO_STATE_OPEN );
-    waldo->mode = WALDO_MODE_NULL;
-
-    return WALDO_FILE_SUCCESS;
+    if(waldo->fd)
+    {
+	close(waldo->fd);
+	waldo->fd = -1;
+    }
+    
+    return 0;
 }
 
 /*
@@ -1020,50 +1674,72 @@ int spoolerCloseWaldo(Waldo *waldo)
 */
 int spoolerReadWaldo(Waldo *waldo)
 {
-    int                 ret;
-    WaldoData           wd;
-
-    /* check if we have a file in the correct mode (READ) */
-    if ( waldo->mode != WALDO_MODE_READ )
+    WaldoData wd;
+    off_t cur_pos = 0;
+    
+    if( (waldo == NULL))
     {
-	/* close waldo if appropriate */
-	if(barnyard2_conf)
-	    spoolerCloseWaldo(waldo);
-
-        if ( (ret=spoolerOpenWaldo(waldo, WALDO_MODE_READ)) != WALDO_FILE_SUCCESS )
-            return ret;
+	return 1;
     }
-    else if ( ! (waldo->state & WALDO_STATE_OPEN) )
+    
+    /* ensure we are at the beggining since we must be open and in read */
+    if( (cur_pos = lseek(waldo->fd, 0, SEEK_SET)) < 0)
     {
-        if ( (ret=spoolerOpenWaldo(waldo, WALDO_MODE_READ)) != WALDO_FILE_SUCCESS )
-            return ret;
-    }
-    else
-    {
-        /* ensure we are at the beggining since we must be open and in read */
-        lseek(waldo->fd, 0, SEEK_SET);
+	LogMessage("ERROR: lseek() Waldo file '%s' (%s)\n", 
+		   waldo->filepath,
+		   strerror(errno));
+	return 1;
     }
     
     /* read values into temporary WaldoData structure */
-    ret = read(waldo->fd, &wd, sizeof(WaldoData));
+    if(read(waldo->fd, &wd, sizeof(WaldoData)) < 0)
+    {
+	LogMessage("ERROR: Reading Waldo file '%s' (%s)\n", 
+		   waldo->filepath,
+		   strerror(errno));
+	return 1;
+    }
+    
 
-    /* TODO: additional checks on the waldo file data to test corruption */
-    if ( ret != sizeof(WaldoData) )
-        return WALDO_FILE_ETRUNC;
-
+    if( (cur_pos = lseek(waldo->fd,0,SEEK_CUR)) < 0)
+    {
+	LogMessage("ERROR: lseek() Waldo file '%s' (%s)\n", 
+		   waldo->filepath,
+		   strerror(errno));
+	return 1;
+    }
+    
+    if ( cur_pos != sizeof(WaldoData) )
+    {
+	/* XXX */
+	LogMessage("ERROR: Waldo file size is incorrect read[%u] expecting[%u] for file [%s] \n"
+		   ">>>Delete waldo and restart barnyard2<<<\n\n",
+		   cur_pos,
+		   sizeof(WaldoData),
+		   waldo->filepath);
+	return 1;
+    }
+    
+    if( (memcmp(waldo->data.spool_dir,wd.spool_dir,strlen(wd.spool_dir)) != 0) ||
+	(memcmp(waldo->data.spool_filebase,wd.spool_filebase,strlen(wd.spool_filebase)) != 0))
+    {
+	LogMessage("ERROR: Waldo file inconsistency: \n"
+		   "[Waldo File]:        Spool Direcyory [%s] - Stored Filebase [%s] \n"
+		   "[Barnyard2 runtime]: Spool Directory [%s] - Invoke Filebase [%s] \n"
+		   ">>>Delete waldo and restart barnyard2<<<\n\n",
+		   wd.spool_dir,wd.spool_filebase,
+		   waldo->data.spool_dir,waldo->data.spool_filebase);
+	return 1;
+    }
+    
     /* copy waldo file contents to the directory structure */
     memcpy(&waldo->data, &wd, sizeof(WaldoData));
-
-    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,
-        "Waldo read\n\tdir:  %s\n\tbase: %s\n\ttime: %lu\n\tidx:  %d\n",
-        waldo->data.spool_dir, waldo->data.spool_filebase,
-        waldo->data.timestamp, waldo->data.record_idx););
-
     
-    /* close waldo if appropriate */
-    if(barnyard2_conf)
-	spoolerCloseWaldo(waldo);
-
+    DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,
+			    "Waldo read\n\tdir:  %s\n\tbase: %s\n\ttime: %lu\n\tidx:  %d\n",
+			    waldo->data.spool_dir, waldo->data.spool_filebase,
+			    waldo->data.timestamp, waldo->data.record_idx););
+    
     return WALDO_FILE_SUCCESS;
 }
 
@@ -1076,46 +1752,32 @@ int spoolerReadWaldo(Waldo *waldo)
 */
 int spoolerWriteWaldo(Waldo *waldo, Spooler *spooler)
 {
-    int                 ret;
-
+    if( (waldo == NULL) ||
+	(spooler == NULL) )
+    {
+	/* xxx */
+	return 1;
+    }
+    
     /* check if we are using waldo files */
-    if ( ! (waldo->state & WALDO_STATE_ENABLED) )
-        return WALDO_STRUCT_EMPTY;
-
-    /* check that a waldo file exists before continued */
-    if (waldo == NULL)
-        return WALDO_STRUCT_EMPTY;
-
+    if( !(waldo->state & WALDO_STATE_ENABLED))
+    {
+        return 1;
+    }
+    
     /* update fields */
     waldo->data.timestamp = spooler->timestamp;
     waldo->data.record_idx = spooler->record_idx;
-
-    /* check if we have a file in the correct mode (READ) */
-    if ( waldo->mode != WALDO_MODE_WRITE )
-    {
-	/* close waldo if appropriate */
-        if(barnyard2_conf)
-            spoolerCloseWaldo(waldo);
-
-
-        spoolerOpenWaldo(waldo, WALDO_MODE_WRITE);
-    }
-    else if ( ! (waldo->state & WALDO_STATE_OPEN) )
-    {
-        spoolerOpenWaldo(waldo, WALDO_MODE_WRITE);
-    }
-    else
-    {
-        /* ensure we are at the start since we must be open and in write */
-        lseek(waldo->fd, 0, SEEK_SET);
-    }
-
+    
+    /* ensure we are at the start since we must be open and in write */
+    lseek(waldo->fd, 0, SEEK_SET);
+    
     /* write values */
-    ret = write(waldo->fd, &waldo->data, sizeof(WaldoData));
-
-    if (ret != sizeof(WaldoData) )
+    if( (write(waldo->fd, &waldo->data, sizeof(WaldoData))) != sizeof(WaldoData))
+    {
         return WALDO_FILE_ETRUNC;
-
+    }
+    
     DEBUG_WRAP(DebugMessage(DEBUG_SPOOLER,
         "Waldo write\n\tdir:  %s\n\tbase: %s\n\ttime: %lu\n\tidx:  %d\n",
         waldo->data.spool_dir, waldo->data.spool_filebase,

@@ -253,19 +253,7 @@ void DumpInputPlugins()
     LogMessage("-------------------------------------------------\n\n");
 }
 
-int AddArgToInputList(char *keyword, void *arg)
-{
-    InputFuncNode *node;
 
-    if(keyword == NULL)
-        return -1;
-    
-    node = GetInputPlugin(keyword);
-
-    node->arg = arg;
-
-    return 0;
-}
 
 int AddReadRecordHeaderFuncToInputList(char *keyword, int (*readRecordHeader)(void *))
 {
@@ -287,7 +275,7 @@ int AddReadRecordHeaderFuncToInputList(char *keyword, int (*readRecordHeader)(vo
 
 int AddReadRecordFuncToInputList(char *keyword, int (*readRecord)(void *))
 {
-    InputFuncNode *node;
+    InputFuncNode *node = NULL;
 
     if(keyword == NULL)
         return -1;
@@ -302,6 +290,71 @@ int AddReadRecordFuncToInputList(char *keyword, int (*readRecord)(void *))
 
     return 0;
 }
+
+
+int AddReadBulkFuncToInputList(char *plugin_name,u_int32_t (*readBulk)(void *))
+{
+    InputFuncNode *node = NULL;
+
+    if((plugin_name == NULL) ||
+       (readBulk == NULL))
+    {
+	return -1;
+    }
+
+    DEBUG_WRAP(DebugMessage(DEBUG_PLUGIN,"Registering keyword:readBulk => %s:%p\n", 
+                            plugin_name, readBulk););
+
+    node = GetInputPlugin(plugin_name);
+    
+    node->readBulk = readBulk;
+    node->configured_flag = InputFuncNodeConfigured(node);
+    
+    return 0;
+}
+
+int AddRewindFileToInputList(char *plugin_name,u_int32_t (*rewindFile)(void *))
+{
+    InputFuncNode *node = NULL;
+
+    if((plugin_name == NULL) ||
+       (rewindFile == NULL))
+    {
+	return -1;
+    }
+
+    DEBUG_WRAP(DebugMessage(DEBUG_PLUGIN,"Registering keyword:rewindFile => %s:%p\n",
+                            plugin_name, rewindFile););
+
+    node = GetInputPlugin(plugin_name);
+
+    node->rewindFile = rewindFile;
+    node->configured_flag = InputFuncNodeConfigured(node);
+    
+    return 0;
+}
+
+int AddGetStateToInputList(char *plugin_name,u_int32_t (*getStat)(void *))
+{
+    InputFuncNode *node = NULL;
+
+    if((plugin_name == NULL) ||
+       (getStat == NULL))
+    {
+	return -1;
+    }
+
+    DEBUG_WRAP(DebugMessage(DEBUG_PLUGIN,"Registering keyword:getStat => %s:%p\n",
+                            plugin_name, getStat););
+    
+    node = GetInputPlugin(plugin_name);
+    
+    node->getStat = getStat;
+    node->configured_flag = InputFuncNodeConfigured(node);
+    
+    return 0;
+}
+
 
 int InputFuncNodeConfigured(InputFuncNode *ifn)
 {

@@ -27,9 +27,14 @@
 #include "config.h"
 #endif
 
+#include <limits.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
+#include "decode.h"
 #include "plugbase.h"
+#include "unified2.h"
 
 #define SPOOLER_EXTENSION_FOUND     0
 #define SPOOLER_EXTENSION_NONE      1
@@ -41,8 +46,6 @@
 #define SPOOLER_STATE_RECORD_READ   2
 
 #define WALDO_STATE_ENABLED         0x01
-#define WALDO_STATE_OPEN            0x02
-#define WALDO_STATE_DIRTY           0x04
 
 #define WALDO_MODE_NULL             0
 #define WALDO_MODE_READ             1
@@ -50,86 +53,149 @@
 
 #define WALDO_FILE_SUCCESS          0
 #define WALDO_FILE_EEXIST           1
+
 #define WALDO_FILE_EOPEN            2
 #define WALDO_FILE_ETRUNC           3
 #define WALDO_FILE_ECORRUPT         4
 #define WALDO_STRUCT_EMPTY          10
 
-
 #define MAX_FILEPATH_BUF    1024
+
+#define PROCESS_RECORD_HEADER 0x00000001
+#define PROCESS_RECORD        0x00000002
+
+
+#define SPOOLER_PROCESS_FASTFORWARD 0x00000001
+#define SPOOLER_PROCESS_NORMAL      0x00000002
+
+
+#define TAG_PRUNE_TIME 301 /* From snort tag.c plus 1 :) */
+
+#define EVENT_CACHE_LEAF_TIMESPLIT 3600
+
+#define SPOOLER_PRINT_DELAY 600 /* 10 minutes */
 
 typedef struct _Record
 {
-    /* raw data */
-    void                *header;
-    void                *data;
-
-    Packet              *pkt;       /* decoded packet */
+/* raw data */
+void                *header;
+void                *data;
+Packet              *pkt;       /* decoded packet */
 } Record;
+
 
 typedef struct _EventRecordNode
 {
-    uint32_t                type;   /* type of event stored */
-    void                    *data;  /* unified2 event (eg IPv4, IPV6, MPLS, etc) */
-    uint8_t                 used;   /* has the event be retrieved */
-    
-    struct _EventRecordNode *next;  /* reference to next event record */
+uint32_t                type;   /* type of event stored */
+void                    *data;  /* unified2 event (eg IPv4, IPV6, MPLS, etc) */
+uint8_t                 used;   /* has the event be retrieved */
+
+struct _EventRecordNode *next;  /* reference to next event record */
 } EventRecordNode;
 
 typedef struct _PacketRecordNode
 {
-    Packet                  *data;  /* packet information */
-    
-    struct _PacketRecordNode *next; /* reference to next event record */
+Packet                  *data;  /* packet information */
+
+struct _PacketRecordNode *next; /* reference to next event record */
 } PacketRecordNode;
 
-typedef struct _Spooler
+
+/* See unified2.h for largest structure */
+#define MAX_UNIFIED2_EVENT_LENGTH sizeof(Unified2IDSEventIPv6)
+#define TRIGGER_PACKET     0x0001
+#define TRIGGER_EXTRA_DATA 0x0002
+
+typedef struct _EventCacheNode
 {
-    InputFuncNode           *ifn;       // Processing function of input file
+    unsigned long event_id;           /* Safety */
+    unsigned long event_second;
+    unsigned long event_type;
+    
+    unsigned long event_trigger_count;
+    unsigned long event_trigger_packet;
+    unsigned long event_trigger_extra_data;
+    
+    unsigned long event_duplicata;
+    unsigned long event_length;
+    void *event_buffer;
+    
+    
+    struct _EventCacheNode *mirror_event; 
+    
+} EventCacheNode;
 
-    int                     fd;         // file descriptor of input file
-    char                    filepath[MAX_FILEPATH_BUF]; // file path of input file
-    time_t                  timestamp;  // time stamp of input file
-    uint32_t                state;      // current read state
-    uint32_t                offset;     // current file offest
-    uint32_t                record_idx; // current record number
 
-    uint32_t                magic;      
-    void                    *header;    // header of input file
 
-    Record                  record;     // data of current Record
+typedef struct _EventCacheLeaf 
+{
+    unsigned long timeChunk; /* seconds / 3600 */
+    unsigned long event_counter;
+    EventCacheNode *eventArr[USHRT_MAX+1]; /* event_id from snort span from 0 to 65535 when considering rollback */
+    struct _EventCacheLeaf *next;
+} EventCacheLeaf;
 
-    EventRecordNode         *event_cache; // linked list of cached events
-    uint32_t                events_cached;
-
-    PacketRecordNode        *packet_cache; // linked list of concurrent packets
-    uint32_t                packets_cached;
-} Spooler;
 
 typedef struct _WaldoData
 {
-    char                    spool_dir[MAX_FILEPATH_BUF];
-    char                    spool_filebase[MAX_FILEPATH_BUF];
-    uint32_t                timestamp;
-    uint32_t                record_idx;
+    char spool_dir[MAX_FILEPATH_BUF];
+    char spool_filebase[MAX_FILEPATH_BUF];
+    uint32_t timestamp;
+    uint32_t record_idx;
+    off_t last_processed_offset;
 } WaldoData;
 
 typedef struct _Waldo
 {
-    int                     fd;                         // file descriptor of the waldo
-    char                    filepath[MAX_FILEPATH_BUF]; // filepath to the waldo
-    uint8_t                 mode;                       // read/write
-    uint8_t                 state;
+    
+    int fd;                          // file descriptor of the waldo
+    char filepath[MAX_FILEPATH_BUF]; // filepath to the waldo
+    
+    int state;
 
-    WaldoData               data;    
+    WaldoData data;    
+
 } Waldo;
 
-int ProcessContinuous(const char *, const char *, uint32_t, uint32_t);
-int ProcessContinuousWithWaldo(struct _Waldo *);
-int ProcessBatch(const char *, const char *);
-int ProcessWaldoFile(const char *);
 
-int spoolerReadWaldo(Waldo *);
+typedef struct _Spooler
+{
+    struct _InputFuncNode *ifn;  // Processing function of input file
+
+    struct stat unified2_stat;
+    int fd;
+    char filepath[MAX_FILEPATH_BUF];
+    u_int32_t timestamp;
+    
+    int state;
+    int offset;
+    
+    struct stat spooler_stat;
+    char *read_buffer;   /* Imported from Unified2InputPluginContext */
+    off_t max_read_size; /* Imported from Unified2InputPluginContext */
+    
+    off_t current_read_size;
+    off_t file_size;
+    off_t last_read_offset;
+    off_t current_process_offset;
+    
+    unsigned long record_idx;
+    Record record;     // data of current Record
+
+    
+    EventCacheLeaf *cacheHead;
+    unsigned long last_cache_event;
+    
+
+    /* Depricated to be deleted */ 
+    uint32_t packets_cached;
+    uint32_t events_cached;
+    PacketRecordNode *packet_cache; // linked list of concurrent packets
+    EventRecordNode *event_cache; // linked list of cached events
+    /* Depricated to be deleted */
+} Spooler;
+
+
 
 #endif /* __SPOOLER_H__ */
 
