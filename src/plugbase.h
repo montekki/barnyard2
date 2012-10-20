@@ -75,19 +75,19 @@ typedef enum _InputType
 {
     INPUT_TYPE__UNIFIED_LOG = 1,
     INPUT_TYPE__UNIFIED_ALERT,
-	INPUT_TYPE__UNIFIED,
+    INPUT_TYPE__UNIFIED,
     INPUT_TYPE__UNIFIED2,
-	INPUT_TYPE__MAX
-
+    INPUT_TYPE__MAX
+    
 } InputType;
 
 typedef enum _OutputType
 {
     OUTPUT_TYPE__ALERT = 1,
     OUTPUT_TYPE__LOG,
-	OUTPUT_TYPE__SPECIAL,
+    OUTPUT_TYPE__SPECIAL,
     OUTPUT_TYPE__MAX
-
+    
 } OutputType;
 
 typedef enum _OutputTypeFlag
@@ -95,14 +95,18 @@ typedef enum _OutputTypeFlag
     OUTPUT_TYPE_FLAG__ALERT = 0x00000001,
     OUTPUT_TYPE_FLAG__LOG   = 0x00000002,
     OUTPUT_TYPE_FLAG__ALL   = 0x7fffffff
-
+    
 } OutputTypeFlag;
 
 
 /***************************** Input Plugin API  ******************************/
-typedef void (*InputConfigFunc)(char *);
+typedef void * (*InputConfigFunc)(char *);
 typedef int (*InputReadHeaderFunc)(void *);
 typedef int (*InputReadRecordFunc)(void *);
+
+typedef u_int32_t (*InputReadBulk)(void *);
+typedef u_int32_t (*InputRewind)(void *);
+typedef u_int32_t (*InputGetStat)(void *);
 
 typedef struct _InputConfigFuncNode
 {
@@ -115,11 +119,13 @@ typedef struct _InputConfigFuncNode
 typedef struct _InputFuncNode
 {
     char *keyword;
-	int					        configured_flag;
-
-    void *arg;
-	int (*readRecordHeader)(void *);
-	int (*readRecord)(void *);
+    int   configured_flag;
+    
+    int (*readRecordHeader)(void *);
+    int (*readRecord)(void *);
+    u_int32_t (*readBulk)(void *);
+    u_int32_t (*rewindFile)(void *);
+    u_int32_t (*getStat)(void *);
 
     struct _InputFuncNode   *next;
 } InputFuncNode;
@@ -131,10 +137,14 @@ void RegisterInputPlugin(char *, InputConfigFunc);
 InputConfigFunc GetInputConfigFunc(char *);
 InputFuncNode *GetInputPlugin(char *);
 void DumpInputPlugins();
-int AddArgToInputList(char *plugin_name, void *arg);
+
 
 int AddReadRecordHeaderFuncToInputList(char *plugin_name, int (*readRecordHeader)(void *));
 int AddReadRecordFuncToInputList(char *plugin_name, int (*readRecord)(void *));
+
+int AddReadBulkFuncToInputList(char *plugin_name,u_int32_t (*readBulk)(void *));
+int AddRewindFileToInputList(char *plugin_name,u_int32_t (*rewindFile)(void *));
+int AddGetStateToInputList(char *plugin_name,u_int32_t (*getStat)(void *));
 
 int InputFuncNodeConfigured(InputFuncNode *ifn);
 

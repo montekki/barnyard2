@@ -114,7 +114,7 @@ int DecodePacket(int linktype, Packet *p, const struct pcap_pkthdr *pkthdr, cons
     switch(linktype)
     {
 		case DLT_EN10MB:        /* Ethernet */
-            DecodeEthPkt(p, pkthdr, pkt);
+		    DecodeEthPkt(p, pkthdr, pkt);
             break;
 
 #ifdef DLT_IEEE802_11

@@ -49,7 +49,9 @@
 #include "sfutil/sf_ipvar.h"
 #include "map.h"
 #include "sf_types.h"
+
 #include "spooler.h"
+
 
 /* TODO: check this should live in the plugin */
 #if defined(HAVE_LIBPRELUDE)
@@ -59,11 +61,11 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
-#define PROGRAM_NAME	"Barnyard"
-#define VER_MAJOR		"2"
-#define VER_MINOR		"1"
-#define VER_REVISION	"10"
-#define VER_BUILD		"310"
+#define PROGRAM_NAME "Barnyard"
+#define VER_MAJOR "2"
+#define VER_MINOR "2" 
+#define VER_REVISION "0"
+#define VER_BUILD "1"
 
 #define STD_BUF  1024
 
@@ -175,6 +177,8 @@ typedef struct _InputConfig
     char *opts;
     char *file_name;
     int file_line;
+
+    void *context;
     struct _InputConfig *next;
 
 } InputConfig;
@@ -236,43 +240,43 @@ typedef enum _RunFlag
     RUN_FLAG__CONF_ERROR_OUT      = 0x00000400,     /* -x and --conf-error-out */
 
 #if defined(WIN32) && defined(ENABLE_WIN32_SERVICE)
-   ,RUN_FLAG__TERMINATE_SERVICE   = 0x04000000,
-    RUN_FLAG__PAUSE_SERVICE       = 0x08000000
+   ,RUN_FLAG__TERMINATE_SERVICE	  = 0x04000000,
+    RUN_FLAG__PAUSE_SERVICE	  = 0x08000000
 #endif
 
 } RunFlag;
 
 typedef enum _OutputFlag
 {
-    OUTPUT_FLAG__LINE_BUFFER       = 0x00000001,      /* -f */
-    OUTPUT_FLAG__VERBOSE_DUMP      = 0x00000002,      /* -X */
-    OUTPUT_FLAG__CHAR_DATA         = 0x00000004,      /* -C */
-    OUTPUT_FLAG__APP_DATA          = 0x00000008,      /* -d */
-    OUTPUT_FLAG__SHOW_DATA_LINK    = 0x00000010,      /* -e */
+    OUTPUT_FLAG__LINE_BUFFER	   = 0x00000001,      /* -f */
+    OUTPUT_FLAG__VERBOSE_DUMP	   = 0x00000002,      /* -X */
+    OUTPUT_FLAG__CHAR_DATA	   = 0x00000004,      /* -C */
+    OUTPUT_FLAG__APP_DATA	   = 0x00000008,      /* -d */
+    OUTPUT_FLAG__SHOW_DATA_LINK	   = 0x00000010,      /* -e */
 #ifndef NO_NON_ETHER_DECODER
-    OUTPUT_FLAG__SHOW_WIFI_MGMT    = 0x00000020,      /* -w */
+    OUTPUT_FLAG__SHOW_WIFI_MGMT	   = 0x00000020,      /* -w */
 #endif
-    OUTPUT_FLAG__USE_UTC           = 0x00000040,      /* -U */
-    OUTPUT_FLAG__INCLUDE_YEAR      = 0x00000080,      /* -y */
+    OUTPUT_FLAG__USE_UTC	   = 0x00000040,      /* -U */
+    OUTPUT_FLAG__INCLUDE_YEAR	   = 0x00000080,      /* -y */
 
     /* Note using this alters the packet - can't be used inline */
-    OUTPUT_FLAG__OBFUSCATE         = 0x00000100,      /* -B */
+    OUTPUT_FLAG__OBFUSCATE	   = 0x00000100,      /* -B */
 
-    OUTPUT_FLAG__ALERT_IFACE       = 0x00000200,      /* -I */
-    OUTPUT_FLAG__NO_TIMESTAMP      = 0x00000400,      /* --nostamps */
-    OUTPUT_FLAG__ALERT_PKT_CNT     = 0x00000800,      /* -A packet-count */
+    OUTPUT_FLAG__ALERT_IFACE	   = 0x00000200,      /* -I */
+    OUTPUT_FLAG__NO_TIMESTAMP	   = 0x00000400,      /* --nostamps */
+    OUTPUT_FLAG__ALERT_PKT_CNT	   = 0x00000800,      /* -A packet-count */
     /* XXX XXX pv.outputVidInAlerts */
-    OUTPUT_FLAG__ALERT_VLAN        = 0x00001000       /* config include_vlan_in_alerts */
+    OUTPUT_FLAG__ALERT_VLAN	   = 0x00001000	      /* config include_vlan_in_alerts */
 
 } OutputFlag;
 
 typedef enum _LoggingFlag
 {
-    LOGGING_FLAG__VERBOSE         = 0x00000001,      /* -v */
-    LOGGING_FLAG__QUIET           = 0x00000002,      /* -q */
-    LOGGING_FLAG__SYSLOG          = 0x00000004       /* -M */
+    LOGGING_FLAG__VERBOSE	  = 0x00000001,	     /* -v */
+    LOGGING_FLAG__QUIET		  = 0x00000002,	     /* -q */
+    LOGGING_FLAG__SYSLOG	  = 0x00000004	     /* -M */
 #ifdef WIN32
-   ,LOGGING_FLAG__SYSLOG_REMOTE   = 0x00000008       /* -s and -E */
+   ,LOGGING_FLAG__SYSLOG_REMOTE	  = 0x00000008	     /* -s and -E */
 #endif
 
 } LoggingFlag;
@@ -294,85 +298,85 @@ typedef struct _Barnyard2Config
     int run_flags;
     int output_flags;
     int logging_flags;
-//    int log_tcpdump;
-//    int no_log;
-
-    VarEntry            *var_table;
+    
+    VarEntry		*var_table;
 #ifdef SUP_IP6
-    vartable_t          *ip_vartable;
+    vartable_t		*ip_vartable;
 #endif
-
-	/* staging - snort specific variables */
-	int					checksums_mode;
-	char				ignore_ports[0x10000];
+    
+    Waldo tempWaldo; /* Used for parse command line and config */
+    
+    /* staging - snort specific variables */
+    int					checksums_mode;
+    char				ignore_ports[0x10000];
 
     /* general variables */
-    char				*config_file;           /* -c */
+    char				*config_file;		/* -c */
     char				*config_dir;
-
-	char				*hostname;		        /* -h or config hostname */
-	char				*interface;		        /* -i or config interface */
-
-    char				*class_file;            /* -C or config class_map */
-    char				*sid_msg_file;          /* -S or config sid_map */
-    char				*gen_msg_file;          /* -G or config gen_map */
-    char				*reference_file;        /* -R or config reference_map */
-    char				*log_dir;               /* -l or config log_dir */
-    char				*orig_log_dir;          /* set in case of chroot */
-    char				*chroot_dir;            /* -t or config chroot */
-    uint8_t	    		verbose;                /* -v */
-    uint8_t		    	localtime;
-    char                *bpf_filter;            /* config bpf_filter */
-
-    int                 thiszone;
+    
+    char				*hostname;			/* -h or config hostname */
+    char				*interface;			/* -i or config interface */
+    
+    char				*class_file;		/* -C or config class_map */
+    char				*sid_msg_file;		/* -S or config sid_map */
+    char				*gen_msg_file;		/* -G or config gen_map */
+    char				*reference_file;	/* -R or config reference_map */
+    char				*log_dir;		/* -l or config log_dir */
+    char				*orig_log_dir;		/* set in case of chroot */
+    char				*chroot_dir;		/* -t or config chroot */
+    uint8_t			verbose;		/* -v */
+    uint8_t			localtime;
+    char		*bpf_filter;		/* config bpf_filter */
+    
+    int			thiszone;
 
     int					quiet_flag;
     int					verbose_flag;
-	int					verbose_bytedump_flag;
-	int					show2hdr_flag;
-	int					char_data_flag;
-	int					data_flag;
-	int					obfuscation_flag;
+    int					verbose_bytedump_flag;
+    int					show2hdr_flag;
+    int					char_data_flag;
+    int					data_flag;
+    int					obfuscation_flag;
     int                 alert_on_each_packet_in_stream_flag;
-
-	int					logtosyslog_flag;
-	int					test_mode_flag;
-	
-	int					use_utc;
-	int					include_year;
-	
+    
+    int					logtosyslog_flag;
+    int					test_mode_flag;
+    
+    int					use_utc;
+    int					include_year;
+    
     int					line_buffer_flag;
     char				nostamp;
-
-
+    
+    
     int                 user_id;
     int                 group_id;
     mode_t              file_mask;
-
+    
     /* -h and -B */
 #ifdef SUP_IP6
-	sfip_t				homenet;
-	sfip_t				obfuscation_net;
+    sfip_t				homenet;
+    sfip_t				obfuscation_net;
 #else
-	u_long				homenet;
-	u_long				netmask;
-	uint32_t			obfuscation_net;
-	uint32_t			obfuscation_mask;
+    u_long				homenet;
+    u_long				netmask;
+    uint32_t			obfuscation_net;
+    uint32_t			obfuscation_mask;
 #endif
-
+    
 #ifdef MPLS
     uint8_t mpls_payload_type;  /* --mpls_payload_type */
     long int mpls_stack_depth;  /* --max_mpls_labelchain_len */
 #endif
-
-	/* batch mode options */
+    
+    /* batch mode options */
     int					batch_mode_flag;
-	int					batch_total_files;
-	char				**batch_filelist;
-
+    int					batch_total_files;
+    char				**batch_filelist;
+    
     /* continual mode options */
-	int					process_new_records_only_flag;
-	Waldo				waldo;
+    int					process_new_records_only_flag;
+    Waldo				waldo;
     char				*archive_dir;
     int					daemon_flag;
     int					daemon_restart_flag;
@@ -380,26 +384,26 @@ typedef struct _Barnyard2Config
     /* runtime parameters */
     char pid_filename[STD_BUF];
     char pid_path[STD_BUF];     /* --pid-path or config pidpath */
-
+    
 
     char pidfile_suffix[MAX_PIDFILE_SUFFIX+1]; /* room for a null */
     char create_pid_file;
     char nolock_pid_file;
-	int done_processing;
+    int done_processing;
     int restart_flag;
     int print_version;
     int usr_signal;
     int cant_hup_signal;
-
+    
     ClassType *classifications;
     ReferenceSystemNode *references;
-
+    
     /* plugin active flags*/
     InputConfig         *input_configs;
     OutputConfig        *output_configs;
-
+    
     PluginSignalFuncNode *plugin_post_config_funcs;
-
+    
 } Barnyard2Config;
 
 /* struct to collect packet statistics */

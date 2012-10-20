@@ -43,21 +43,30 @@
 #define BARNYARD2_CONF_KEYWORD__VERSION              "version"
 
 /* Config options */
-#define CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM  "alert_on_each_packet_in_stream"
-#define CONFIG_OPT__ALERT_WITH_IFACE_NAME           "alert_with_interface_name"
+//R E V I E W
+//#define CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM  "alert_on_each_packet_in_stream"
+//#define CONFIG_OPT__ALERT_WITH_IFACE_NAME           "alert_with_interface_name"
+//#ifdef MPLS
+//# define CONFIG_OPT__MAX_MPLS_LABELCHAIN_LEN        "max_mpls_labelchain_len"
+//# define CONFIG_OPT__MPLS_PAYLOAD_TYPE              "mpls_payload_type"
+//#endif  /* MPLS */
+//#define CONFIG_OPT__SHOW_YEAR                       "show_year"
+//#define CONFIG_OPT__DECODE_DATA_LINK                "decode_data_link"
+//R E V I E W
+
 #define CONFIG_OPT__ARCHIVE_DIR                     "archivedir"
+#define CONFIG_OPT__LOG_DIR                         "logdir"
+
 #define CONFIG_OPT__CHROOT_DIR                      "chroot"
 #define CONFIG_OPT__CLASSIFICATION                  "classification"
 #define CONFIG_OPT__CLASSIFICATION_FILE             "classification_file"
 #define CONFIG_OPT__DAEMON                          "daemon"
-#define CONFIG_OPT__DECODE_DATA_LINK                "decode_data_link"
 #define CONFIG_OPT__DUMP_CHARS_ONLY                 "dump_chars_only"
 #define CONFIG_OPT__DUMP_PAYLOAD                    "dump_payload"
 #define CONFIG_OPT__DUMP_PAYLOAD_VERBOSE            "dump_payload_verbose"
 #define CONFIG_OPT__GEN_FILE                        "gen_file"
 #define CONFIG_OPT__HOSTNAME                        "hostname"
 #define CONFIG_OPT__INTERFACE                       "interface"
-#define CONFIG_OPT__LOG_DIR                         "logdir"
 #define CONFIG_OPT__OBFUSCATE                       "obfuscate"
 #define CONFIG_OPT__PID_PATH                        "pidpath"
 #define CONFIG_OPT__PROCESS_NEW_RECORDS_ONLY        "process_new_records_only"
@@ -67,17 +76,12 @@
 #define CONFIG_OPT__REFERENCE_NET                   "reference_net"
 #define CONFIG_OPT__SET_GID                         "set_gid"
 #define CONFIG_OPT__SET_UID                         "set_uid"
-#define CONFIG_OPT__SHOW_YEAR                       "show_year"
 #define CONFIG_OPT__SID_FILE                        "sid_file"
 #define CONFIG_OPT__STATEFUL                        "stateful"
 #define CONFIG_OPT__UMASK                           "umask"
 #define CONFIG_OPT__UTC                             "utc"
 #define CONFIG_OPT__VERBOSE                         "verbose"
 #define CONFIG_OPT__WALDO_FILE                      "waldo_file"
-#ifdef MPLS
-# define CONFIG_OPT__MAX_MPLS_LABELCHAIN_LEN        "max_mpls_labelchain_len"
-# define CONFIG_OPT__MPLS_PAYLOAD_TYPE              "mpls_payload_type"
-#endif  /* MPLS */
 
 
 
@@ -137,12 +141,13 @@ void ConfigSetUid(Barnyard2Config *, char *);
 void ConfigSidFile(Barnyard2Config *, char *);
 void ConfigShowYear(Barnyard2Config *, char *);
 void ConfigStateful(Barnyard2Config *, char *);
-void ConfigSpoolFilebase(Barnyard2Config *, char *);
-void ConfigSpoolDirectory(Barnyard2Config *, char *);
+void ConfigSpoolFilebase(Waldo *, char *);
+void ConfigSpoolDirectory(Waldo *, char *);
 void ConfigUmask(Barnyard2Config *, char *);
 void ConfigUtc(Barnyard2Config *, char *);
 void ConfigVerbose(Barnyard2Config *, char *);
-void ConfigWaldoFile(Barnyard2Config *, char *);
+void ConfigWaldoFile(Waldo *, char *);
+
 #ifdef MPLS
 void ConfigMaxMplsLabelChain(Barnyard2Config *, char *);
 void ConfigMplsPayloadType(Barnyard2Config *, char *);

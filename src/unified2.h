@@ -123,21 +123,51 @@ typedef struct _Unified2ExtraDataHdr{
 
 
 //UNIFIED2_EXTRA_DATA - type 110
-typedef struct _Unified2ExtraData{
+//typedef struct _Unified2ExtraData{
+//  uint32_t sensor_id;
+//  uint32_t event_id;
+//  uint32_t event_second;
+//  uint32_t type;              /* EventInfo */
+//  uint32_t data_type;         /*EventDataType */
+//  uint32_t blob_length;       /* Length of the data + sizeof(blob_length) + sizeof(data_type)*/
+//} Unified2ExtraData;
+
+/* INFO: 
+   Imported from Snort 2.9.4 */
+typedef struct _Data_Blob
+{
+    uint32_t length;
+    const uint8_t *data;
+} Data_Blob;
+
+//UNIFIED2_EXTRA_DATA - type 110
+typedef struct _Serial_Unified2ExtraData{
     uint32_t sensor_id;
     uint32_t event_id;
     uint32_t event_second;
-    uint32_t type;              /* EventInfo */
-    uint32_t data_type;         /*EventDataType */
-    uint32_t blob_length;       /* Length of the data + sizeof(blob_length) + sizeof(data_type)*/
+    uint32_t type;
+    Data_Blob data;
 } Unified2ExtraData;
 
+
+/* INFO:
+   Imported for 2.9.4 
+*/
 typedef enum _EventInfoEnum
 {
     EVENT_INFO_XFF_IPV4 = 1,
-    EVENT_INFO_XFF_IPV6 ,
+    EVENT_INFO_XFF_IPV6,
     EVENT_INFO_REVIEWED_BY,
-    EVENT_INFO_GZIP_DATA
+    EVENT_INFO_GZIP_DATA,
+    EVENT_INFO_SMTP_FILENAME,
+    EVENT_INFO_SMTP_MAILFROM,
+    EVENT_INFO_SMTP_RCPTTO,
+    EVENT_INFO_SMTP_EMAIL_HDRS,
+    EVENT_INFO_HTTP_URI,
+    EVENT_INFO_HTTP_HOSTNAME,
+    EVENT_INFO_IPV6_SRC,
+    EVENT_INFO_IPV6_DST,
+    EVENT_INFO_JSNORM_DATA
 }EventInfoEnum;
 
 typedef enum _EventDataType
@@ -148,9 +178,9 @@ typedef enum _EventDataType
 
 #define EVENT_TYPE_EXTRA_DATA   4
 
-#define MAX_XFF_WRITE_BUF_LENGTH (sizeof(Unified2RecordHeader) + \
-        sizeof(Unified2ExtraDataHdr) + sizeof(Unified2ExtraData) \
-        + sizeof(struct in6_addr))
+#define MAX_XFF_WRITE_BUF_LENGTH (sizeof(Unified2RecordHeader) +	\
+				  sizeof(Unified2ExtraDataHdr) + sizeof(Unified2ExtraData) \
+				  + sizeof(struct in6_addr))
 
 
 //---------------LEGACY, type '7'

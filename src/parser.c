@@ -189,14 +189,14 @@ static const KeywordFunc barnyard2_conf_keywords[] =
 
 static const ConfigFunc config_opts[] =
 {
-    { CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM, 0, 1, ConfigAlertOnEachPacketInStream },
-    { CONFIG_OPT__ALERT_WITH_IFACE_NAME, 0, 1, ConfigAlertWithInterfaceName },
+    //{ CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM, 0, 1, ConfigAlertOnEachPacketInStream },
+    //{ CONFIG_OPT__ALERT_WITH_IFACE_NAME, 0, 1, ConfigAlertWithInterfaceName },
     { CONFIG_OPT__ARCHIVE_DIR, 1, 1, ConfigArchiveDir },
     { CONFIG_OPT__CHROOT_DIR, 1, 1, ConfigChrootDir },
     { CONFIG_OPT__CLASSIFICATION, 1, 0, ConfigClassification },
     { CONFIG_OPT__CLASSIFICATION_FILE, 1, 0, ConfigClassificationFile },
     { CONFIG_OPT__DAEMON, 0, 1, ConfigDaemon },
-    { CONFIG_OPT__DECODE_DATA_LINK, 0, 1, ConfigDecodeDataLink },
+    //{ CONFIG_OPT__DECODE_DATA_LINK, 0, 1, ConfigDecodeDataLink },
     { CONFIG_OPT__DUMP_CHARS_ONLY, 0, 1, ConfigDumpCharsOnly },
     { CONFIG_OPT__DUMP_PAYLOAD, 0, 1, ConfigDumpPayload },
     { CONFIG_OPT__DUMP_PAYLOAD_VERBOSE, 0, 1, ConfigDumpPayloadVerbose },
@@ -217,7 +217,7 @@ static const ConfigFunc config_opts[] =
     { CONFIG_OPT__SET_GID, 1, 1, ConfigSetGid },
     { CONFIG_OPT__SET_UID, 1, 1, ConfigSetUid },
     { CONFIG_OPT__SID_FILE, 1, 0, ConfigSidFile },
-    { CONFIG_OPT__SHOW_YEAR, 0, 1, ConfigShowYear },
+    //{ CONFIG_OPT__SHOW_YEAR, 0, 1, ConfigShowYear },
     { CONFIG_OPT__UMASK, 1, 1, ConfigUmask },
     { CONFIG_OPT__UTC, 0, 1, ConfigUtc },
     { CONFIG_OPT__VERBOSE, 0, 1, ConfigVerbose },
@@ -367,29 +367,36 @@ void ConfigureInputPlugins(Barnyard2Config *bc)
     InputConfig *config;
     char *stored_file_name = file_name;
     int stored_file_line = file_line;
-
+    
     barnyard2_conf_for_parsing = bc;
-
+    
     DEBUG_WRAP(DebugMessage(DEBUG_CONFIGRULES,"Input Plugin\n"););
-
+    
     for (config = bc->input_configs; config != NULL; config = config->next)
     {
         InputConfigFunc func;
-
+	
         file_name = config->file_name;
         file_line = config->file_line;
-
+	
         func = GetInputConfigFunc(config->keyword);
+	
         if (func == NULL)
+	{
             ParseError("Unknown input plugin: \"%s\"", config->keyword);
-
-        func(config->opts);
+	}
+	
+        if( (config->context = func(config->opts)) == NULL)
+	{
+	    FatalError("[%s()], error configuring [%s] Input Plugin \n",
+		       __FUNCTION__,
+		       config->keyword);
+	}
     }
-
-    /* Reset these since we're done with configuring dynamic preprocessors */
+    
     file_name = stored_file_name;
     file_line = stored_file_line;
-
+    
     barnyard2_conf_for_parsing = NULL;
 }
 
@@ -2175,33 +2182,40 @@ void ConfigProcessNewRecordsOnly(Barnyard2Config *bc, char *args)
     bc->process_new_records_only_flag = 1;
 }
 
-void ConfigSpoolFilebase(Barnyard2Config *bc, char *args)
+void ConfigSpoolFilebase(Waldo *waldo, char *args)
 {
-    if ((args == NULL) || (bc == NULL) )
+    if ((args == NULL) || (waldo == NULL) )
         return;
 
-    if ( SnortSnprintf(bc->waldo.data.spool_filebase, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
+    if ( SnortSnprintf(waldo->data.spool_filebase, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
         FatalError("barnyard2: spool filebase too long\n");
 }
 
-void ConfigSpoolDirectory(Barnyard2Config *bc, char *args)
+void ConfigSpoolDirectory(Waldo *waldo, char *args)
 {
-    if ((args == NULL) || (bc == NULL) )
+    if ((args == NULL) || (waldo == NULL) )
         return;
 
-    if ( SnortSnprintf(bc->waldo.data.spool_dir, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
+    int len = strlen(args);
+    
+    if(args[len-1] == '/')
+    {
+	args[len-1] = '\0';
+    }
+    
+    if ( SnortSnprintf(waldo->data.spool_dir, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
         FatalError("barnyard2: spool directory too long\n");
 }
 
-void ConfigWaldoFile(Barnyard2Config *bc, char *args)
+void ConfigWaldoFile(Waldo *waldo, char *args)
 {
-    if ((args == NULL) || (bc == NULL) )
+    if ((args == NULL) || (waldo == NULL) )
         return;
-
-    if ( SnortSnprintf(bc->waldo.filepath, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
+    
+    if ( SnortSnprintf(waldo->filepath, STD_BUF, "%s", args) != SNORT_SNPRINTF_SUCCESS )
         FatalError("barnyard2: waldo filepath too long\n");
 
-    bc->waldo.state |= WALDO_STATE_ENABLED;
+    waldo->state |= WALDO_STATE_ENABLED;
 }
 
 #ifdef MPLS

@@ -61,6 +61,7 @@
 #include <strings.h>
 #endif
 
+
 #include "barnyard2.h"
 #include "mstring.h"
 #include "debug.h"
@@ -147,28 +148,30 @@ double CalcPct(uint64_t cnt, uint64_t total)
 int DisplayBanner(void)
 {
     fprintf(stderr, "\n"
-        "  ______   -*> Barnyard2 <*-\n"
-        " / ,,_  \\  Version %s.%s.%s (Build %s)%s%s\n"
-        " |o\"  )~|  By Ian Firns (SecurixLive): http://www.securixlive.com/\n"
-		" + '''' +  (C) Copyright 2008-2012 Ian Firns <firnsy@securixlive.com>\n"
-        "\n"
-        , VER_MAJOR, VER_MINOR, VER_REVISION, VER_BUILD,
+	    "  ______   -*> Barnyard2 <*-\n"
+	    " / ,,_  \\  Version %s.%s.%s (Build %s)%s%s\n"
+	    " |o\"  )~|  By Ian Firns (SecurixLive): http://www.securixlive.com/\n"
+	    " + '''' +     Eric Lauzon <beenph@gmail.com>\n"  
+	    " (C) Copyright 2008-2012 Ian Firns <firnsy@securixlive.com>\n"
+	    " (C) Copyright 2011-2012 Eric Lauzon <beenph@gmail.com>\n"
+	    "\n"
+	    , VER_MAJOR, VER_MINOR, VER_REVISION, VER_BUILD,
 #ifdef DEBUG
-		" DEBUG",
+	    " DEBUG",
 #else
-		"",
+	    "",
 #endif
 #ifdef SUP_IP6
-		" IPv6"
+	    " IPv6"
 #else
-		""
+	    ""
 #endif
 #ifdef ENABLE_TCL
-		" TCL"
+	    " TCL"
 #else
-		""
+	    ""
 #endif
-); 
+	); 
     return 0;
 }
 
@@ -836,19 +839,19 @@ void SetUidGid(int user_id, int group_id)
 void DropStats(int exiting)
 {
     uint64_t total = 0;
-
+    
     LogMessage("================================================"
                "===============================\n");
-
+    
     LogMessage("Record Totals:\n");
     LogMessage("   Records: " FMTu64("12") "\n", pc.total_records);
-    LogMessage("    Events: " FMTu64("12") " (%.3f%%)\n", pc.total_events,
+    LogMessage("    Events: " FMTu64("12") " (%7.3f%%)\n", pc.total_events,
                CalcPct(pc.total_events, pc.total_records));
-    LogMessage("   Packets: " FMTu64("12") " (%.3f%%)\n", pc.total_packets,
+    LogMessage("   Packets: " FMTu64("12") " (%7.3f%%)\n", pc.total_packets,
                CalcPct(pc.total_packets, pc.total_records));
-    LogMessage("   Unknown: " FMTu64("12") " (%.3f%%)\n", pc.total_unknown,
+    LogMessage("   Unknown: " FMTu64("12") " (%7.3f%%)\n", pc.total_unknown,
                CalcPct(pc.total_unknown, pc.total_records));
-
+    
     total = pc.total_packets;
 
     LogMessage("================================================"
@@ -856,122 +859,122 @@ void DropStats(int exiting)
 
     LogMessage("Packet breakdown by protocol (includes rebuilt packets):\n");
 
-    LogMessage("      ETH: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      ETH: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.eth, CalcPct(pc.eth, total));
-    LogMessage("  ETHdisc: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  ETHdisc: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ethdisc, CalcPct(pc.ethdisc, total));
 #ifdef GIDS
 #ifndef IPFW
-    LogMessage(" IPTables: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" IPTables: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.iptables, CalcPct(pc.iptables, total));
 #else
-    LogMessage("     IPFW: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     IPFW: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipfw, CalcPct(pc.ipfw, total));
 #endif  /* IPFW */
 #endif  /* GIDS */
-    LogMessage("     VLAN: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     VLAN: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.vlan, CalcPct(pc.vlan, total));
 
     if (pc.nested_vlan != 0)
-    LogMessage("Nested VLAN: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("Nested VLAN: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.nested_vlan, CalcPct(pc.nested_vlan, total));
 
-    LogMessage("     IPV6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     IPV6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipv6, CalcPct(pc.ipv6, total));
-    LogMessage("  IP6 EXT: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  IP6 EXT: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip6ext, CalcPct(pc.ip6ext, total));
-    LogMessage("  IP6opts: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  IP6opts: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipv6opts, CalcPct(pc.ipv6opts, total));
-    LogMessage("  IP6disc: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  IP6disc: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipv6disc, CalcPct(pc.ipv6disc, total));
 
-    LogMessage("      IP4: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      IP4: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip, CalcPct(pc.ip, total));
-    LogMessage("  IP4disc: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  IP4disc: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipdisc, CalcPct(pc.ipdisc, total));
 
-    LogMessage("    TCP 6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("    TCP 6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.tcp6, CalcPct(pc.tcp6, total));
-    LogMessage("    UDP 6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("    UDP 6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.udp6, CalcPct(pc.udp6, total));
-    LogMessage("    ICMP6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("    ICMP6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.icmp6, CalcPct(pc.icmp6, total));
-    LogMessage("  ICMP-IP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  ICMP-IP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.embdip, CalcPct(pc.embdip, total));
 
-    LogMessage("      TCP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      TCP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.tcp, CalcPct(pc.tcp, total));
-    LogMessage("      UDP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      UDP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.udp, CalcPct(pc.udp, total));
-    LogMessage("     ICMP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     ICMP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.icmp, CalcPct(pc.icmp, total));
 
-    LogMessage("  TCPdisc: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  TCPdisc: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.tdisc, CalcPct(pc.tdisc, total));
-    LogMessage("  UDPdisc: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  UDPdisc: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.udisc, CalcPct(pc.udisc, total));
-    LogMessage("  ICMPdis: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  ICMPdis: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.icmpdisc, CalcPct(pc.icmpdisc, total));
 
-    LogMessage("     FRAG: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     FRAG: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.frags, CalcPct(pc.frags, total));
-    LogMessage("   FRAG 6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("   FRAG 6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.frag6, CalcPct(pc.frag6, total));
 
-    LogMessage("      ARP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      ARP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.arp, CalcPct(pc.arp, total));
 #ifndef NO_NON_ETHER_DECODER
-    LogMessage("    EAPOL: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("    EAPOL: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.eapol, CalcPct(pc.eapol, total));
 #endif
-    LogMessage("  ETHLOOP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  ETHLOOP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ethloopback, CalcPct(pc.ethloopback, total));
-    LogMessage("      IPX: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      IPX: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ipx, CalcPct(pc.ipx, total));
 #ifdef GRE
-    LogMessage("IPv4/IPv4: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("IPv4/IPv4: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip4ip4, CalcPct(pc.ip4ip4, total));
-    LogMessage("IPv4/IPv6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("IPv4/IPv6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip4ip6, CalcPct(pc.ip4ip6, total));
-    LogMessage("IPv6/IPv4: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("IPv6/IPv4: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip6ip4, CalcPct(pc.ip6ip4, total));
-    LogMessage("IPv6/IPv6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("IPv6/IPv6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.ip6ip6, CalcPct(pc.ip6ip6, total));
-    LogMessage("      GRE: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("      GRE: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre, CalcPct(pc.gre, total));
-    LogMessage("  GRE ETH: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  GRE ETH: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_eth, CalcPct(pc.gre_eth, total));
-    LogMessage(" GRE VLAN: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" GRE VLAN: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_vlan, CalcPct(pc.gre_vlan, total));
-    LogMessage(" GRE IPv4: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" GRE IPv4: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_ip, CalcPct(pc.gre_ip, total));
-    LogMessage(" GRE IPv6: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" GRE IPv6: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_ipv6, CalcPct(pc.gre_ipv6, total));
-    LogMessage("GRE IP6 E: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("GRE IP6 E: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_ipv6ext, CalcPct(pc.gre_ipv6ext, total));
-    LogMessage(" GRE PPTP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" GRE PPTP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_ppp, CalcPct(pc.gre_ppp, total));
-    LogMessage("  GRE ARP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  GRE ARP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_arp, CalcPct(pc.gre_arp, total));
-    LogMessage("  GRE IPX: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  GRE IPX: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_ipx, CalcPct(pc.gre_ipx, total));
-    LogMessage(" GRE LOOP: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage(" GRE LOOP: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.gre_loopback, CalcPct(pc.gre_loopback, total));
 #endif  /* GRE */
 #ifdef MPLS
-    LogMessage("     MPLS: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("     MPLS: " FMTu64("-10") " (%7.3f%%)\n", 
                    pc.mpls, CalcPct(pc.mpls, total));
 #endif
-    LogMessage("    OTHER: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("    OTHER: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.other, CalcPct(pc.other, total));
-    LogMessage("  DISCARD: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("  DISCARD: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.discards, CalcPct(pc.discards, total));
-    LogMessage("InvChkSum: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("InvChkSum: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.invalid_checksums, CalcPct(pc.invalid_checksums, total));
 
-    LogMessage("   S5 G 1: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("   S5 G 1: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.s5tcp1, CalcPct(pc.s5tcp1, total));
-    LogMessage("   S5 G 2: " FMTu64("-10") " (%.3f%%)\n", 
+    LogMessage("   S5 G 2: " FMTu64("-10") " (%7.3f%%)\n", 
                pc.s5tcp2, CalcPct(pc.s5tcp2, total));
 
     LogMessage("    Total: " FMTu64("-10") "\n", total);
@@ -984,11 +987,11 @@ void DropStats(int exiting)
                    "===============================\n");
         LogMessage("Wireless Stats:\n");
         LogMessage("Breakdown by type:\n");
-        LogMessage("    Management Packets: " FMTu64("-10") " (%.3f%%)\n", 
+        LogMessage("    Management Packets: " FMTu64("-10") " (%7.3f%%)\n", 
                    pc.wifi_mgmt, CalcPct(pc.wifi_mgmt, total));
-        LogMessage("    Control Packets:    " FMTu64("-10") " (%.3f%%)\n", 
+        LogMessage("    Control Packets:    " FMTu64("-10") " (%7.3f%%)\n", 
                    pc.wifi_control, CalcPct(pc.wifi_control, total));
-        LogMessage("    Data Packets:       " FMTu64("-10") " (%.3f%%)\n", 
+        LogMessage("    Data Packets:       " FMTu64("-10") " (%7.3f%%)\n", 
                    pc.wifi_data, CalcPct(pc.wifi_data, total));
     }
 #endif  /* DLT_IEEE802_11 */

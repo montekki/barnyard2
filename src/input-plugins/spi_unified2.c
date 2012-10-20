@@ -20,7 +20,6 @@
 **
 */
 
-
 /*
 ** INCLUDES
 */
@@ -28,54 +27,34 @@
 #include "config.h"
 #endif
 
-#include <sys/types.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifdef SOLARIS
-    #include <strings.h>
+#include <strings.h>
 #endif
-#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
-
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 
 #include "barnyard2.h"
+#include "mstring.h"
 #include "debug.h"
 #include "plugbase.h"
-#include "spi_unified2.h"
-#include "spooler.h"
 #include "strlcpyu.h"
 #include "util.h"
 #include "unified2.h"
 
-/*
-** PROTOTYPES
-*/
-void Unified2Init(char *);
 
-/* processing functions  */
-int Unified2ReadRecordHeader(void *);
-int Unified2ReadRecord(void *);
+#include "spooler.h"
 
-int Unified2ReadEventRecord(void *);
-int Unified2ReadEvent6Record(void *);
-int Unified2ReadPacketRecord(void *);
+#include "input-plugins/spi_unified2.h"
 
-void Unified2PrintCommonRecord(Unified2EventCommon *);
-void Unified2PrintEventRecord(Unified2IDSEvent_legacy *);
-void Unified2PrintEvent6Record(Unified2IDSEventIPv6_legacy *);
-void Unified2PrintPacketRecord(Unified2Packet *);
-
-/* restart/shutdown functions */
-void Unified2CleanExitFunc(int, void *);
-void Unified2RestartFunc(int, void *);
-
-
-void Unified2PrintEventRecord(Unified2IDSEvent_legacy *);
-void Unified2PrintEvent6Record(Unified2IDSEventIPv6_legacy *);
+static u_int32_t Unified2ReadBulk(void *sph);
 
 
 /*
@@ -93,29 +72,288 @@ void Unified2PrintEvent6Record(Unified2IDSEventIPv6_legacy *);
 void Unified2Setup(void)
 {
     /* link the input keyword to the init function in the input list */
+    DEBUG_WRAP(DebugMessage(DEBUG_INIT,"Input plugin: Unified2Init is initialized \n"););
     RegisterInputPlugin("unified2", Unified2Init);
-    DEBUG_WRAP(DebugMessage(DEBUG_INIT,"Input plugin: Unified2 is setup...\n"););
 }
 
-void Unified2Init(char *args)
+void * Unified2Init(char *args)
 {
+    Unified2InputPluginContext *data = NULL;
+    
     /* parse the argument list from the rules file */
-    //data = ParseAlertTestArgs(args);
+    if( (data = parseUnified2InputArgs(args)) == NULL)
+    {
+	LogMessage("[%s()], error parsing Plugin arguments \n",
+	    __FUNCTION__);
+	return NULL;
+    }
+    
+    if( (data->read_buffer=(char *)calloc(1,data->read_size)) == NULL)
+    {
+	/* XXX */
+	LogMessage("[%s()], can't allocate processing buffer \n",
+	    __FUNCTION__);
+	return NULL;
+    }
 
     DEBUG_WRAP(DebugMessage(DEBUG_INIT,"Linking UnifiedLog functions to call lists...\n"););
     
     /* Link the input processor read/process functions to the function list */
+    AddReadBulkFuncToInputList("unified2",Unified2ReadBulk);
+    AddRewindFileToInputList("unified2", Unified2Rewind);
+    AddGetStateToInputList("unified2",Unified2GetStat);
+
     AddReadRecordHeaderFuncToInputList("unified2", Unified2ReadRecordHeader);
     AddReadRecordFuncToInputList("unified2", Unified2ReadRecord);
 
     /* Link the input processor exit/restart functions into the function list */
-    AddFuncToCleanExitList(Unified2CleanExitFunc, NULL);
-    AddFuncToRestartList(Unified2RestartFunc, NULL);
+    AddFuncToCleanExitList(Unified2CleanExitFunc, data);
+    AddFuncToRestartList(Unified2RestartFunc, data);
+    
+    return data;
 }
 
-/* Partial reads should rarely, if ever, happen.  Thus we should not actually
-   call lseek very often 
+/** 
+ * Parse unified2 input plugin configuration.
+ * 
+ * @param args
+ * 
+ * @return [OK]    Unified2InputPluginContext *
+ * @return [ERROR] NULL 
  */
+Unified2InputPluginContext * parseUnified2InputArgs(char *args)
+{
+    Unified2InputPluginContext *rContext = NULL;
+    
+    int num_toks = 0;
+    int i = 0;
+    char **toks = NULL;
+    char *op_mode = NULL;
+    
+    u_int32_t spiOpCtx = 0;
+    ssize_t read_size = 0;
+    
+    if(args == NULL)
+    {
+	/* XXX */
+	LogMessage("[%s()], No argument supplied, can't continue \n",
+		   __FUNCTION__);
+	return NULL;
+    }
+    
+    toks = mSplit((char *)args, ",", 31, &num_toks, '\\');
+    for(i = 0; i < num_toks; ++i)
+    {
+	char **stoks = NULL;
+	int num_stoks = 0;
+	char *index = toks[i];
+	while(isspace((int)*index))
+	    ++index;
+	
+	stoks = mSplit(index, " ", 2, &num_stoks, 0);
+	
+	if(strcasecmp("input_mode", stoks[0]) == 0)
+	{
+	    if(num_stoks >= 1)
+	    {
+		op_mode = strndup(stoks[1],64);
+		
+		if(strcasecmp("unified2",op_mode) == 0)
+		{
+		    spiOpCtx = LogContextUNIFIED2;
+		}
+		else if(strcasecmp("alert_unified2",op_mode) == 0)
+		{
+		    spiOpCtx= LogContextALERTUNIFIED2;
+		}
+		else if(strcasecmp("log_unified2",op_mode) == 0)
+		{
+		    spiOpCtx = LogContextLOGUNIFIED2;
+		}    
+		else
+		{
+		    /* XXX */
+		    LogMessage("parseUnified2InputArgs(): Unknown mode [%s] specified to input_mode directive.\n"
+			       "\t\t\t  Unified2 Input processor accecpt one of the following mode: (unified2|alert_unified2|log_unified2) \n",stoks[1]);
+		    
+		    goto f_err;
+		}
+	    }
+	    else
+	    {
+		/* XXX */
+		LogMessage("parseUnified2InputArgs(): Need argument to input_mode directive: (unified2|alert_unified2|log_unified2) \n");
+		goto f_err;
+	    }
+
+	}
+	else if(strcasecmp("read_size", stoks[0]) == 0)
+	{
+	    if(num_stoks >= 1)
+	    {
+		read_size = strtol(stoks[1],NULL,10);
+	    }
+	}
+	else
+	{
+	    /* XXX */
+	    LogMessage("[%s]: unknown option [%s]\n",
+		       __FUNCTION__,
+		       stoks[0]);
+	    goto f_err;
+	}
+	
+	mSplitFree(&stoks, num_stoks);
+    }
+    
+    mSplitFree(&toks, num_toks);
+    
+    if(op_mode != NULL)
+    {
+	free(op_mode);
+	op_mode = NULL;
+    }
+    
+    if(spiOpCtx)
+    {
+	if( (rContext=SnortAlloc(sizeof(Unified2InputPluginContext))) == NULL)
+	{
+	    return NULL;
+	}
+    }
+    
+    /* validate/assign */
+    if( (read_size < 0) ||
+	(read_size > 1024))
+    {
+	LogMessage("[%s()], invalid read_size defined as argument [%d] use betwen 1 and 1024 since the value is multiplied by 4096. \n",
+		   __FUNCTION__,
+		   read_size);
+	
+	read_size = ReadSizeDefault;
+    }
+    
+    if( (read_size == 0))
+    {
+	//rContext->read_size = ( ReadSizeDefault * UNIFIED2_MAX_EVENT_SIZE *  DefaultBlockSize); 
+	rContext->read_size = ( ReadSizeDefault * UNIFIED2_MAX_EVENT_SIZE);
+    }
+    else
+    {
+	//rContext->read_size = read_size * DefaultBlockSize * UNIFIED2_MAX_EVENT_SIZE;
+	rContext->read_size = ( read_size * UNIFIED2_MAX_EVENT_SIZE);
+    }
+    
+    rContext->operation_mode = spiOpCtx;
+    return rContext;
+    
+f_err:
+    if(op_mode != NULL)
+    {
+	free(op_mode);
+	op_mode = NULL;
+    }
+    return NULL;
+}
+
+/* Get file stat */
+u_int32_t Unified2GetStat(void *sph)
+{
+    Spooler *spooler = (Spooler *)sph;
+
+    if(spooler == NULL)
+    {
+        return 1;
+    }
+
+    if( fstat(spooler->fd,&spooler->unified2_stat))
+    {
+	LogMessage("[%s()] ERROR: stat() error: %s\n", 
+		   __FUNCTION__,
+		   strerror(errno));
+        return 1;
+    }
+    
+    return 0;
+}
+
+/* Read bulk data from unified2 file */
+static u_int32_t Unified2ReadBulk(void *sph)
+{
+    Spooler *spooler = (Spooler *)sph;
+    off_t delta_offset = 0;
+    if(spooler == NULL)
+    {
+	return 1;
+    }
+    
+    memset(spooler->read_buffer,'\0',spooler->max_read_size);
+    
+    if( (read(spooler->fd,spooler->read_buffer,spooler->max_read_size)) < 0)
+    {
+	LogMessage("[%s()] ERROR: Read error: %s\n", 
+		   __FUNCTION__,
+		   strerror(errno));
+        return 1;
+    }
+    
+    delta_offset = spooler->last_read_offset;
+    
+    if( (spooler->last_read_offset = lseek(spooler->fd,0,SEEK_CUR)) < 0)
+    {
+        LogMessage("[%s()] ERROR: lseek error: %s\n",
+                   __FUNCTION__,
+                   strerror(errno));
+        return 1;
+    }
+    
+    spooler->current_read_size = spooler->last_read_offset - delta_offset;
+    return 0;
+}
+
+/* Rewind for miss read */
+u_int32_t Unified2Rewind(void *sph)
+{
+    Spooler *spooler = (Spooler *)sph;
+    off_t rewind_offset = 0;                         
+    off_t current_offset = 0;                         
+    
+    if(spooler == NULL)
+    {
+        return 1;
+    }
+    
+    if( (current_offset = lseek(spooler->fd,0,SEEK_CUR)) < 0)
+    {
+	LogMessage("[%s()] ERROR: lseek error: %s\n",
+                   __FUNCTION__,
+                   strerror(errno));
+	return 1;
+    }
+    
+    if( (current_offset != spooler->last_read_offset))
+    {
+	return 1;
+    }
+    
+    
+    rewind_offset = current_offset - (spooler->current_read_size - spooler->current_process_offset);
+    
+    if( (current_offset = lseek(spooler->fd,rewind_offset,SEEK_SET)) < 0)
+    {
+	LogMessage("[%s()] ERROR: lseek error: %s\n",
+                   __FUNCTION__,
+                   strerror(errno));
+	return 1;
+    }
+    
+    spooler->last_read_offset = rewind_offset;
+    spooler->current_read_size = 0;
+    spooler->current_process_offset = 0;
+    
+    return 0;
+}
+
 int Unified2ReadRecordHeader(void *sph)
 {
     ssize_t             bytes_read;
@@ -236,12 +474,31 @@ int Unified2ReadRecord(void *sph)
 void Unified2CleanExitFunc(int signal, void *arg)
 {
     DEBUG_WRAP(DebugMessage(DEBUG_LOG,"Unified2CleanExitFunc\n"););
+    
+    Unified2InputPluginContext *data;
+    if(arg != NULL)
+    {
+	data = (Unified2InputPluginContext *)arg;
+	free(arg);
+    }
+    
+    return;
 }
 
 void Unified2RestartFunc(int signal, void *arg)
 {
     DEBUG_WRAP(DebugMessage(DEBUG_LOG,"Unified2RestartFunc\n"););
+
+    Unified2InputPluginContext *data;
+    if(arg != NULL)
+    {
+	data = (Unified2InputPluginContext *)arg;
+	free(arg);
+    }
+    
+    return;
 }
+
 
 #ifdef DEBUG
 void Unified2PrintEventCommonRecord(Unified2EventCommon *evt)
