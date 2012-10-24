@@ -43,7 +43,7 @@
 #include "barnyard2.h"
 #include "debug.h"
 
-#define CACHED_EVENTS_MAX 256
+
 
 int ProcessContinuous(InputConfig *);
 int ProcessContinuousWithWaldo(InputConfig *);
@@ -1172,6 +1172,7 @@ int ProcessContinuous(InputConfig *iContext)
 	    /* This is where the actual processing occur or data was appended. */
 	    else
 	    {
+
 		spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
 		spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
 		
@@ -1522,7 +1523,7 @@ int spoolerEventCacheClean(Spooler *spooler)
     ernPrev = spooler->event_cache;
     ernCurrent = spooler->event_cache;
     
-    while (ernCurrent != NULL && spooler->events_cached > CACHED_EVENTS_MAX )
+    while (ernCurrent != NULL && spooler->events_cached > barnyard2_conf->event_cache_size )
     {
 	ernNext = ernCurrent->next;
 	

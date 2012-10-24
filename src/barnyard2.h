@@ -61,7 +61,6 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
-
 #define PROGRAM_NAME "Barnyard"
 #define VER_MAJOR "2"
 #define VER_MINOR "2" 
@@ -165,6 +164,7 @@ typedef enum _GetOptLongIds
     CONF_ERROR_OUT,
     DISABLE_ALERT_ON_EACH_PACKET_IN_STREAM,
     ALERT_ON_EACH_PACKET_IN_STREAM,
+    EVENT_CACHE_SIZE,
 
 #ifdef MPLS
     MAX_MPLS_LABELCHAIN_LEN,
@@ -301,8 +301,17 @@ typedef struct _Barnyard2Config
     int run_flags;
     int output_flags;
     int logging_flags;
+<<<<<<< HEAD
     
     VarEntry		*var_table;
+=======
+//    int log_tcpdump;
+//    int no_log;
+    
+    unsigned int event_cache_size;
+
+    VarEntry            *var_table;
+>>>>>>> fixed: conflict when cherry picking #51
 #ifdef SUP_IP6
     vartable_t		*ip_vartable;
 #endif

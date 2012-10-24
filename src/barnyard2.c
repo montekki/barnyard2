@@ -186,6 +186,7 @@ static struct option long_options[] =
    {"reference", LONGOPT_ARG_REQUIRED, NULL, 'R'},
    {"classification", LONGOPT_ARG_REQUIRED, NULL, 'C'},
    {"disable-alert-on-each-packet-in-stream", LONGOPT_ARG_NONE, NULL, DISABLE_ALERT_ON_EACH_PACKET_IN_STREAM},
+   {"event-cache-size", LONGOPT_ARG_REQUIRED, NULL, EVENT_CACHE_SIZE},
    {"alert-on-each-packet-in-stream", LONGOPT_ARG_NONE, NULL, ALERT_ON_EACH_PACKET_IN_STREAM},
    {"process-new-records-only", LONGOPT_ARG_NONE, NULL, 'n'},
 
@@ -489,17 +490,18 @@ static int ShowUsage(char *program_name)
 	FPUTS_BOTH ("\n");
 
     FPUTS_BOTH ("Longname options and their corresponding single char version\n");
-    FPUTS_BOTH ("   --reference <file>		      Same as -R\n");
-    FPUTS_BOTH ("   --classification <file>	      Same as -C\n");
-    FPUTS_BOTH ("   --gen-msg <file>		      Same as -G\n");
-    FPUTS_BOTH ("   --sid-msg <file>		      Same as -S\n");
-    FPUTS_BOTH ("   --alert-on-each-packet-in-stream  Call output plugins on each packet in an alert stream\n");
-    FPUTS_BOTH ("   --process-new-records-only	      Same as -n\n");
-    FPUTS_BOTH ("   --pid-path <dir>		      Specify the directory for the barnyard2 PID file\n");
-    FPUTS_BOTH ("   --help			      Same as -?\n");
-    FPUTS_BOTH ("   --version			      Same as -V\n");
-    FPUTS_UNIX ("   --create-pidfile		      Create PID file, even when not in Daemon mode\n");
-    FPUTS_UNIX ("   --nolock-pidfile		      Do not try to lock barnyard2 PID file\n");
+    FPUTS_BOTH ("   --disable-alert-on-each-packet-in-stream  Alert once per event\n");
+    FPUTS_BOTH ("   --event-cache-size <integer>      Set Spooler MAX event cache size \n");
+    FPUTS_BOTH ("   --reference <file>                Same as -R\n");
+    FPUTS_BOTH ("   --classification <file>           Same as -C\n");
+    FPUTS_BOTH ("   --gen-msg <file>                  Same as -G\n");
+    FPUTS_BOTH ("   --sid-msg <file>                  Same as -S\n");
+    FPUTS_BOTH ("   --process-new-records-only        Same as -n\n");
+    FPUTS_BOTH ("   --pid-path <dir>                  Specify the directory for the barnyard2 PID file\n");
+    FPUTS_BOTH ("   --help                            Same as -?\n");
+    FPUTS_BOTH ("   --version                         Same as -V\n");
+    FPUTS_UNIX ("   --create-pidfile                  Create PID file, even when not in Daemon mode\n");
+    FPUTS_UNIX ("   --nolock-pidfile                  Do not try to lock barnyard2 PID file\n");
 #ifdef MPLS
     FPUTS_BOTH ("   --max-mpls-labelchain-len	      Specify the max MPLS label chain\n");
     FPUTS_BOTH ("   --mpls-payload-type		      Specify the protocol (ipv4, ipv6, ethernet) that is encapsulated by MPLS\n");
@@ -630,10 +632,9 @@ static void ParseCmdLine(int argc, char **argv)
 		ConfigNoLoggingTimestamps(bc, NULL);
 		break;
 
-	    case ALERT_ON_EACH_PACKET_IN_STREAM:
-		ConfigAlertOnEachPacketInStream(bc, NULL);
-		break;
-
+           case EVENT_CACHE_SIZE:
+                ConfigSetEventCacheSize(bc,optarg);
+                break;
 #ifdef MPLS
 	    case MAX_MPLS_LABELCHAIN_LEN:
 		ConfigMaxMplsLabelChain(bc, optarg);
@@ -1523,10 +1524,17 @@ static Barnyard2Config * MergeBarnyard2Confs(Barnyard2Config *cmd_line, Barnyard
 
 	config_file->log_dir = SnortStrdup(cmd_line->log_dir);
     }
-
+    
     if (config_file == NULL)
 	return cmd_line;
 
+    if( cmd_line->event_cache_size > config_file->event_cache_size)
+    {
+	config_file->event_cache_size = cmd_line->event_cache_size;
+    }
+    
+
+    
     /* Used because of a potential chroot */
     config_file->orig_log_dir = SnortStrdup(config_file->log_dir);
 
@@ -1721,6 +1729,20 @@ static void Barnyard2Init(int argc, char **argv)
 	
         bc->config_dir = strdup(barnyard2_conf_dir);
         bc->config_file = strdup(barnyard2_conf_file);
+
+        /* Merge the command line and config file confs to take care of
+         * command line overriding config file.
+         * Set the global barnyard2_conf that will be used during run time */
+        barnyard2_conf = MergeBarnyard2Confs(barnyard2_cmd_line_conf, bc);
+	
+	if(barnyard2_conf->event_cache_size == 0)
+	{
+	    barnyard2_conf->event_cache_size = 2048;
+	}
+	
+	LogMessage("Barnyard2 spooler: Event cache size set to [%u] \n",
+		   barnyard2_conf->event_cache_size);
+	
     }
     
     ConfigureInputPlugins(bc);
