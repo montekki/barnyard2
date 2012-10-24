@@ -185,6 +185,7 @@ static struct option long_options[] =
    {"sid-msg", LONGOPT_ARG_REQUIRED, NULL, 'S'},
    {"reference", LONGOPT_ARG_REQUIRED, NULL, 'R'},
    {"classification", LONGOPT_ARG_REQUIRED, NULL, 'C'},
+   {"disable-alert-on-each-packet-in-stream", LONGOPT_ARG_NONE, NULL, DISABLE_ALERT_ON_EACH_PACKET_IN_STREAM},
    {"alert-on-each-packet-in-stream", LONGOPT_ARG_NONE, NULL, ALERT_ON_EACH_PACKET_IN_STREAM},
    {"process-new-records-only", LONGOPT_ARG_NONE, NULL, 'n'},
 
@@ -551,7 +552,10 @@ static void ParseCmdLine(int argc, char **argv)
     barnyard2_cmd_line_conf = Barnyard2ConfNew();
     barnyard2_conf = barnyard2_cmd_line_conf;	  /* Set the global for log messages */
     bc = barnyard2_cmd_line_conf;
-
+    
+    /* alert_on_each_packet_in_stream_flag enabled by default */
+    bc->alert_on_each_packet_in_stream_flag = 1;
+    
     /* Look for a -D and/or -M switch so we can start logging to syslog
      * with "barnyard2" tag right away */
     for (i = 0; i < argc; i++)

@@ -43,17 +43,9 @@
 #define BARNYARD2_CONF_KEYWORD__VERSION              "version"
 
 /* Config options */
-//R E V I E W
-//#define CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM  "alert_on_each_packet_in_stream"
-//#define CONFIG_OPT__ALERT_WITH_IFACE_NAME           "alert_with_interface_name"
-//#ifdef MPLS
-//# define CONFIG_OPT__MAX_MPLS_LABELCHAIN_LEN        "max_mpls_labelchain_len"
-//# define CONFIG_OPT__MPLS_PAYLOAD_TYPE              "mpls_payload_type"
-//#endif  /* MPLS */
-//#define CONFIG_OPT__SHOW_YEAR                       "show_year"
-//#define CONFIG_OPT__DECODE_DATA_LINK                "decode_data_link"
-//R E V I E W
-
+#define CONFIG_OPT__DISABLE_ALERT_ON_EACH_PACKET_IN_STREAM  "disable_alert_on_each_packet_in_stream"
+#define CONFIG_OPT__ALERT_ON_EACH_PACKET_IN_STREAM  "alert_on_each_packet_in_stream"
+#define CONFIG_OPT__ALERT_WITH_IFACE_NAME           "alert_with_interface_name"
 #define CONFIG_OPT__ARCHIVE_DIR                     "archivedir"
 #define CONFIG_OPT__LOG_DIR                         "logdir"
 
@@ -111,6 +103,7 @@ void ConfigureOutputPlugins(Barnyard2Config *);
 NORETURN void ParseError(const char *, ...);
 void ParseMessage(const char *, ...);
 
+void ConfigDisableAlertOnEachPacketInStream(Barnyard2Config *, char *);
 void ConfigAlertOnEachPacketInStream(Barnyard2Config *, char *);
 void ConfigAlertWithInterfaceName(Barnyard2Config *, char *);
 void ConfigArchiveDir(Barnyard2Config *, char *);

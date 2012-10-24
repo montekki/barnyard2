@@ -163,6 +163,7 @@ typedef enum _GetOptLongIds
 
     DETECTION_SEARCH_METHOD,
     CONF_ERROR_OUT,
+    DISABLE_ALERT_ON_EACH_PACKET_IN_STREAM,
     ALERT_ON_EACH_PACKET_IN_STREAM,
 
 #ifdef MPLS
@@ -349,7 +350,6 @@ typedef struct _Barnyard2Config
     
     int					line_buffer_flag;
     char				nostamp;
-    
     
     int                 user_id;
     int                 group_id;
