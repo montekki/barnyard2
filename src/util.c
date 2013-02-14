@@ -151,6 +151,7 @@ int DisplayBanner(void)
 	    " (C) Copyright 2011-2012 Eric Lauzon <beenph@gmail.com>\n"
 	    "\n"
 	    , VER_MAJOR, VER_MINOR, VER_REVISION, VER_BUILD,
+
 #ifdef DEBUG
 	    " DEBUG",
 #else
