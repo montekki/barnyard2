@@ -2266,8 +2266,8 @@ u_int32_t base64_STATIC(const u_char * xdata, int length,char *output)
 {
     int count, cols, bits, c, char_count;
     unsigned char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";  /* 64 bytes */
-    char * payloadptr;
     
+
     char_count = 0;
     bits = 0;
     cols = 0;
@@ -2280,7 +2280,6 @@ u_int32_t base64_STATIC(const u_char * xdata, int length,char *output)
     
     memset(output,'\0',MAX_QUERY_LENGTH);
 
-    payloadptr = output;
 
     for(count = 0; count < length; count++)
     {
@@ -2719,3 +2718,35 @@ u_int32_t string_sanitize_character(char *input,char ichar)
     return 0;
 }
 
+
+int BY2Strtoul(char *inStr,unsigned long *ul_ptr)
+{
+    char *endptr = NULL;
+    
+    if( (inStr == NULL) ||
+        (ul_ptr == NULL))
+    {
+        return 1;
+    }
+    
+    *ul_ptr = strtoul(inStr,&endptr,10);
+    
+    if ((errno == ERANGE && ( *ul_ptr == LONG_MAX || *ul_ptr == LONG_MIN)) ||
+        (errno != 0 && *ul_ptr == 0))
+    {
+        FatalError("[%s()], strtoul error : [%s] for [%s]\n",
+                   __FUNCTION__,
+                   strerror(errno),
+                   inStr);
+    }
+    
+    if( *endptr != '\0' || (endptr == inStr))
+    {
+        LogMessage("[%s()], is not a digit [%s] \n",
+                   __FUNCTION__,
+                   inStr);
+        return 1;
+    }
+    
+    return 0;
+}
