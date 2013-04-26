@@ -61,12 +61,20 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
+<<<<<<< HEAD
 #define PROGRAM_NAME "Barnyard"
 #define VER_MAJOR "2"
 #define VER_MINOR "2" 
 #define VER_REVISION "0"
 #define VER_BUILD "1"
 
+=======
+#define PROGRAM_NAME	"Barnyard"
+#define VER_MAJOR	"2"
+#define VER_MINOR	"1"
+#define VER_REVISION	"13-BETA"
+#define VER_BUILD	"326"
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
 
 #define STD_BUF  1024
 
@@ -311,27 +319,18 @@ typedef struct _VarNode
 } VarNode;
 
 
-#define SS_SINGLE 0x0001
-#define SS_RANGE  0x0002
-
-typedef struct _SigSuppress_list
-{
-    u_int8_t  ss_type;  /* Single or Range */
-    u_int8_t  flag;     /* Flagged for deletion */
-    unsigned long gid;  /* Generator id */
-    unsigned long ss_min; /* VAL for SS_SINGLE, MIN VAL for RANGE */
-    unsigned long ss_max; /* VAL for SS_SINGLE, MAX VAL for RANGE */
-    struct _SigSuppress_list *next;
-} SigSuppress_list;
-
 /* struct to contain the program variables and command line args */
 typedef struct _Barnyard2Config
 {
+/* Does not need cleanup */
     RunMode run_mode;
+    int checksums_mode;
+    char ignore_ports[0x10000];
     int run_mode_flags;
     int run_flags;
     int output_flags;
     int logging_flags;
+<<<<<<< HEAD
     unsigned int event_cache_size;
     VarEntry            *var_table;
 
@@ -348,37 +347,25 @@ typedef struct _Barnyard2Config
     /* general variables */
     char				*config_file;		/* -c */
     char				*config_dir;
+=======
+    int thiszone;
+    int	quiet_flag;
+    int	verbose_flag;
+    int	verbose_bytedump_flag;
+    int	show2hdr_flag;
+    int	char_data_flag;
+    int data_flag;
+    int obfuscation_flag;
+    int alert_on_each_packet_in_stream_flag;
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     
-    char				*hostname;		        /* -h or config hostname */
-    char				*interface;		        /* -i or config interface */
-
-    char				*class_file;            /* -C or config class_map */
-    char				*sid_msg_file;          /* -S or config sid_map */
-    short                               sidmap_version;         /* Set by ReadSidFile () */
-    char				*gen_msg_file;          /* -G or config gen_map */
-
-    char				*reference_file;        /* -R or config reference_map */
-    char				*log_dir;               /* -l or config log_dir */
-    char				*orig_log_dir;          /* set in case of chroot */
-    char				*chroot_dir;            /* -t or config chroot */
-    uint8_t	    		verbose;                /* -v */
-    uint8_t		    	localtime;
-    char                *bpf_filter;            /* config bpf_filter */
-
-    int                 thiszone;
-
-    int					quiet_flag;
-    int					verbose_flag;
-    int					verbose_bytedump_flag;
-    int					show2hdr_flag;
-    int					char_data_flag;
-    int					data_flag;
-    int					obfuscation_flag;
-    int                 alert_on_each_packet_in_stream_flag;
+    int	logtosyslog_flag;
+    int	test_mode_flag;
     
-    int					logtosyslog_flag;
-    int					test_mode_flag;
+    int use_utc;
+    int include_year;
     
+<<<<<<< HEAD
     int					use_utc;
     int					include_year;
     
@@ -388,40 +375,58 @@ typedef struct _Barnyard2Config
     int                 user_id;
     int                 group_id;
     mode_t              file_mask;
+=======
+    int line_buffer_flag;
+    char nostamp;
+    int user_id;
+    int group_id;
+    mode_t file_mask;
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     
     /* -h and -B */
 #ifdef SUP_IP6
-    sfip_t				homenet;
-    sfip_t				obfuscation_net;
+    sfip_t homenet;
+    sfip_t obfuscation_net;
 #else
-    u_long				homenet;
-    u_long				netmask;
-    uint32_t			obfuscation_net;
-    uint32_t			obfuscation_mask;
+    u_long homenet;
+    u_long netmask;
+    uint32_t obfuscation_net;
+    uint32_t obfuscation_mask;
 #endif
     
 #ifdef MPLS
     uint8_t mpls_payload_type;  /* --mpls_payload_type */
     long int mpls_stack_depth;  /* --max_mpls_labelchain_len */
 #endif
+<<<<<<< HEAD
     
     /* batch mode options */
     int					batch_mode_flag;
     int					batch_total_files;
     char				**batch_filelist;
+=======
+
+    /* batch mode options */
+    int batch_mode_flag;
+    int batch_total_files;
+
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     
     /* continual mode options */
-    int					process_new_records_only_flag;
-    Waldo				waldo;
-    char				*archive_dir;
-    int					daemon_flag;
-    int					daemon_restart_flag;
+    int process_new_records_only_flag;
+    Waldo waldo;
+
+    int	daemon_flag;
+    int daemon_restart_flag;
     
     /* runtime parameters */
     char pid_filename[STD_BUF];
     char pid_path[STD_BUF];     /* --pid-path or config pidpath */
+<<<<<<< HEAD
     
 
+=======
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     char pidfile_suffix[MAX_PIDFILE_SUFFIX+1]; /* room for a null */
     char create_pid_file;
     char nolock_pid_file;
@@ -430,21 +435,62 @@ typedef struct _Barnyard2Config
     int print_version;
     int usr_signal;
     int cant_hup_signal;
+<<<<<<< HEAD
     
 
     SigSuppress_list *ssHead;
+=======
+    unsigned int event_cache_size;
+    uint8_t verbose;                /* -v */
+    uint8_t localtime;
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
 
+/* Need to be handled by Barnyard2ConfFree() */
+
+    VarEntry *var_table;
+#ifdef SUP_IP6
+    vartable_t *ip_vartable;
+#endif
+    SigSuppress_list *ssHead;
+    
     ClassType *classifications;
     ReferenceSystemNode *references;
-
     SigNode *sigHead;  /* Signature list Head */
-
+    
     /* plugin active flags*/
+<<<<<<< HEAD
     InputConfig         *input_configs;
     OutputConfig        *output_configs;
     
     PluginSignalFuncNode *plugin_post_config_funcs;
     
+=======
+    InputConfig *input_configs;
+    OutputConfig *output_configs;
+    PluginSignalFuncNode *plugin_post_config_funcs;
+    
+    char *config_file;           /* -c */
+    char *config_dir;
+    char *hostname;             /* -h or config hostname */
+    char *interface;	        /* -i or config interface */
+    
+    char *class_file;          /* -C or config class_map */
+    char *sid_msg_file;        /* -S or config sid_map */
+    short sidmap_version;      /* Set by ReadSidFile () */
+    char *gen_msg_file;        /* -G or config gen_map */
+
+    char *reference_file;      /* -R or config reference_map */
+    char *log_dir;             /* -l or config log_dir */
+    char *orig_log_dir;        /* set in case of chroot */
+    char *chroot_dir;          /* -t or config chroot */
+
+    char *bpf_filter;          /* config bpf_filter */
+    char **batch_filelist;
+    char *archive_dir;
+
+    Spooler *spooler; /* Used to know if we need to call spoolerClose */
+
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
 } Barnyard2Config;
 
 /* struct to collect packet statistics */
@@ -595,15 +641,19 @@ extern int exit_signal;
 extern Barnyard2Config *barnyard2_conf_for_parsing;
 
 /*  P R O T O T Y P E S  ******************************************************/
+Barnyard2Config * Barnyard2ConfNew(void);
+
 int Barnyard2Main(int argc, char *argv[]);
 int Barnyard2Sleep(unsigned int);
+int SignalCheck(void);
+
 void CleanExit(int);
 void SigCantHupHandler(int signal);
 void FreeVarList(VarNode *);
-Barnyard2Config * Barnyard2ConfNew(void);
 void Barnyard2ConfFree(Barnyard2Config *);
 void CleanupPreprocessors(Barnyard2Config *);
 void CleanupPlugins(Barnyard2Config *);
+
 
 static INLINE int BcTestMode(void)
 {

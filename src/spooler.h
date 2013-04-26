@@ -126,7 +126,6 @@ typedef struct _EventCacheNode
 } EventCacheNode;
 
 
-
 typedef struct _EventCacheLeaf 
 {
     unsigned long timeChunk; /* seconds / 3600 */
@@ -195,6 +194,15 @@ typedef struct _Spooler
     /* Depricated to be deleted */
 } Spooler;
 
+
+
+int spoolerReadWaldo(Waldo *);
+void spoolerEventCacheFlush(Spooler *);
+void RegisterSpooler(Spooler *);
+void UnRegisterSpooler(Spooler *);
+
+int spoolerCloseWaldo(Waldo *);
+int spoolerClose(Spooler *);
 
 
 #endif /* __SPOOLER_H__ */

@@ -474,6 +474,7 @@ int Unified2ReadRecord(void *sph)
 void Unified2CleanExitFunc(int signal, void *arg)
 {
     DEBUG_WRAP(DebugMessage(DEBUG_LOG,"Unified2CleanExitFunc\n"););
+<<<<<<< HEAD
     
     Unified2InputPluginContext *data;
     if(arg != NULL)
@@ -482,12 +483,15 @@ void Unified2CleanExitFunc(int signal, void *arg)
 	free(arg);
     }
     
+=======
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     return;
 }
 
 void Unified2RestartFunc(int signal, void *arg)
 {
     DEBUG_WRAP(DebugMessage(DEBUG_LOG,"Unified2RestartFunc\n"););
+<<<<<<< HEAD
 
     Unified2InputPluginContext *data;
     if(arg != NULL)
@@ -496,6 +500,8 @@ void Unified2RestartFunc(int signal, void *arg)
 	free(arg);
     }
     
+=======
+>>>>>>> Last minute commit for a long waited needed feature and some little fix.
     return;
 }
 

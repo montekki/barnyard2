@@ -179,6 +179,7 @@ int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint
     void *read_buffer_ptr = NULL;
     
     /* perform sanity checks */
+
     if ( (spooler == NULL) || 
 	 (filename == NULL) ||
 	 (dirpath == NULL))
@@ -199,6 +200,8 @@ int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint
     spooler->max_read_size = read_size;
     /* ELZ: We will need to have a cleaner way to do this :) */
 
+    RegisterSpooler(spooler);
+
     /* build the full filepath */
     /* need to check if we could be smarter about extension being 0 and filepath relation ...process batch kind of issue */
     if (extension == 0)
@@ -217,10 +220,11 @@ int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint
 			   filename,
 			   extension)) != SNORT_SNPRINTF_SUCCESS)
 	{
+
+	    UnRegisterSpooler(spooler);
 	    spoolerClose(spooler);
 	    FatalError("spooler: filepath too long!\n");
 	}
-    }
 
     spooler->timestamp = extension;
     
@@ -230,6 +234,9 @@ int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint
     {
         LogMessage("ERROR: Unable to open log spool file '%s' (%s)\n", 
 		   spooler->filepath, strerror(errno));
+
+
+	UnRegisterSpooler(spooler);
         spoolerClose(spooler);
 	return 1;
     }
@@ -249,6 +256,7 @@ int spoolerOpen(Spooler *spooler,const char *dirpath, const char *filename, uint
 
     if (spooler->ifn == NULL)
     {
+	UnRegisterSpooler(spooler);
         spoolerClose(spooler);
 	FatalError("ERROR: No suitable input plugin found!\n");
     }
@@ -277,6 +285,51 @@ int spoolerClose(Spooler *spooler)
     
     return 0;
 }
+
+void RegisterSpooler(Spooler *spooler)
+{
+    Barnyard2Config *bc =  BcGetConfig();
+    
+    if(!bc)
+	return;
+    
+    
+    if(bc->spooler)
+    {
+	/* XXX */
+	FatalError("[%s()], can't register spooler. \n",
+		   __FUNCTION__);
+    }
+    else
+    {
+	bc->spooler = spooler;
+    }
+    
+    return;
+}
+
+void UnRegisterSpooler(Spooler *spooler)
+{
+    Barnyard2Config *bc =  BcGetConfig();
+
+    if(!bc)
+	return;
+    
+    if(bc->spooler != spooler)
+    {
+	/* XXX */
+	FatalError("[%s()], can't un-register spooler. \n",
+		   __FUNCTION__);
+    }
+    else
+    {
+	bc->spooler = NULL;
+    }
+
+    return;
+}
+
+
 
 int spoolerReadRecordHeader(Spooler *spooler)
 {
@@ -706,6 +759,9 @@ int ProcessBatch(const char *dirpath, const char *filename)
 
     while (exit_signal == 0 && pb_ret == 0)
     {
+	/* for SIGUSR1 / dropstats */
+	SignalCheck();
+	
         switch (spooler->state)
         {
             case SPOOLER_STATE_OPENED:
@@ -1042,6 +1098,7 @@ spoolerProcess_reevaluate_context:
     return 0;
 }
 
+
 /*
 ** ProcessContinuous(InputConfig *iContext)
 **
@@ -1049,12 +1106,10 @@ spoolerProcess_reevaluate_context:
 int ProcessContinuous(InputConfig *iContext)
 {
     unsigned long extension = 0;
-
     unsigned long last_record_count = 0;
 
     time_t last_print_time = 0;
     time_t current_time = 0;
-
 
 
     Spooler *spooler = NULL;
@@ -1074,6 +1129,9 @@ int ProcessContinuous(InputConfig *iContext)
     
     while(exit_signal == 0)
     {
+	/* for SIGUSR1 / dropstats */
+	SignalCheck();
+
 	/* Could have other uses? */
 	current_time = time(NULL);
 	
@@ -1172,7 +1230,9 @@ int ProcessContinuous(InputConfig *iContext)
 	    /* This is where the actual processing occur or data was appended. */
 	    else
 	    {
-
+		continue;
+	    }
+	    
 		spooler->max_read_size = ((Unified2InputPluginContext *)iContext->context)->read_size;
 		spooler->read_buffer = ((Unified2InputPluginContext *)iContext->context)->read_buffer;
 		
@@ -1226,8 +1286,11 @@ int ProcessContinuous(InputConfig *iContext)
 	}
     }
     
-    spoolerCloseWaldo(waldo);
-    return 0;
+    /* close waldo if appropriate */
+    if(barnyard2_conf)
+    	spoolerCloseWaldo(&barnyard2_conf->waldo);
+    
+    return pc_ret;
 }
 
 
@@ -1564,15 +1627,6 @@ int spoolerEventCacheClean(Spooler *spooler)
     return 0;
 }
 
-void spoolerFreeRecord(Record *record)
-{
-    if (record->data)
-    {
-        free(record->data);
-    }
-    
-    record->data = NULL;
-}
 
 
 /*
@@ -1663,6 +1717,7 @@ int spoolerCloseWaldo(Waldo *waldo)
     }
     
     return 0;
+
 }
 
 /*
