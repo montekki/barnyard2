@@ -61,20 +61,13 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
-<<<<<<< HEAD
+
 #define PROGRAM_NAME "Barnyard"
 #define VER_MAJOR "2"
 #define VER_MINOR "2" 
 #define VER_REVISION "0"
 #define VER_BUILD "1"
 
-=======
-#define PROGRAM_NAME	"Barnyard"
-#define VER_MAJOR	"2"
-#define VER_MINOR	"1"
-#define VER_REVISION	"13-BETA"
-#define VER_BUILD	"326"
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
 
 #define STD_BUF  1024
 
@@ -330,24 +323,16 @@ typedef struct _Barnyard2Config
     int run_flags;
     int output_flags;
     int logging_flags;
-<<<<<<< HEAD
     unsigned int event_cache_size;
-    VarEntry            *var_table;
+    VarEntry *var_table;
 
 #ifdef SUP_IP6
     vartable_t		*ip_vartable;
 #endif
     
     Waldo tempWaldo; /* Used for parse command line and config */
-    
-    /* staging - snort specific variables */
-    int					checksums_mode;
-    char				ignore_ports[0x10000];
 
     /* general variables */
-    char				*config_file;		/* -c */
-    char				*config_dir;
-=======
     int thiszone;
     int	quiet_flag;
     int	verbose_flag;
@@ -357,31 +342,18 @@ typedef struct _Barnyard2Config
     int data_flag;
     int obfuscation_flag;
     int alert_on_each_packet_in_stream_flag;
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
-    
     int	logtosyslog_flag;
     int	test_mode_flag;
     
     int use_utc;
     int include_year;
-    
-<<<<<<< HEAD
-    int					use_utc;
-    int					include_year;
-    
-    int					line_buffer_flag;
-    char				nostamp;
-    
-    int                 user_id;
-    int                 group_id;
-    mode_t              file_mask;
-=======
+
     int line_buffer_flag;
     char nostamp;
     int user_id;
     int group_id;
     mode_t file_mask;
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
+
     
     /* -h and -B */
 #ifdef SUP_IP6
@@ -398,19 +370,11 @@ typedef struct _Barnyard2Config
     uint8_t mpls_payload_type;  /* --mpls_payload_type */
     long int mpls_stack_depth;  /* --max_mpls_labelchain_len */
 #endif
-<<<<<<< HEAD
-    
-    /* batch mode options */
-    int					batch_mode_flag;
-    int					batch_total_files;
-    char				**batch_filelist;
-=======
 
     /* batch mode options */
     int batch_mode_flag;
     int batch_total_files;
 
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
     
     /* continual mode options */
     int process_new_records_only_flag;
@@ -422,11 +386,7 @@ typedef struct _Barnyard2Config
     /* runtime parameters */
     char pid_filename[STD_BUF];
     char pid_path[STD_BUF];     /* --pid-path or config pidpath */
-<<<<<<< HEAD
-    
 
-=======
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
     char pidfile_suffix[MAX_PIDFILE_SUFFIX+1]; /* room for a null */
     char create_pid_file;
     char nolock_pid_file;
@@ -435,15 +395,12 @@ typedef struct _Barnyard2Config
     int print_version;
     int usr_signal;
     int cant_hup_signal;
-<<<<<<< HEAD
-    
 
     SigSuppress_list *ssHead;
-=======
+
     unsigned int event_cache_size;
     uint8_t verbose;                /* -v */
     uint8_t localtime;
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
 
 /* Need to be handled by Barnyard2ConfFree() */
 
@@ -458,13 +415,7 @@ typedef struct _Barnyard2Config
     SigNode *sigHead;  /* Signature list Head */
     
     /* plugin active flags*/
-<<<<<<< HEAD
-    InputConfig         *input_configs;
-    OutputConfig        *output_configs;
-    
-    PluginSignalFuncNode *plugin_post_config_funcs;
-    
-=======
+
     InputConfig *input_configs;
     OutputConfig *output_configs;
     PluginSignalFuncNode *plugin_post_config_funcs;
@@ -490,7 +441,6 @@ typedef struct _Barnyard2Config
 
     Spooler *spooler; /* Used to know if we need to call spoolerClose */
 
->>>>>>> Last minute commit for a long waited needed feature and some little fix.
 } Barnyard2Config;
 
 /* struct to collect packet statistics */
