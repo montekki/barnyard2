@@ -671,7 +671,7 @@ int pbCheckSignatureSuppression(void *event)
     SigSuppress_list *cNode = NULL;
     u_int32_t gid = 0;
     u_int32_t sid = 0;
-    
+
     if( (uCommon == NULL) ||
 	(sHead == NULL))
     {
@@ -698,8 +698,8 @@ int pbCheckSignatureSuppression(void *event)
 		break;
 		
 	    case SS_RANGE:
-		if( (cNode->ss_min >= sid) &&
-		    (cNode->ss_max <= sid))
+		if( (sid >= cNode->ss_min) &&
+		    (sid <= cNode->ss_max))
 		{
 		    SigSuppressCount();
 		    return 1;
