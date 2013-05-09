@@ -1955,8 +1955,11 @@ static Barnyard2Config * MergeBarnyard2Confs(Barnyard2Config *cmd_line, Barnyard
 
 
     if(cmd_line->ssHead)
-	config_file->ssHead = cmd_line->ssHead;
-    
+    {
+        config_file->ssHead = cmd_line->ssHead;
+        cmd_line->ssHead = NULL;
+    }
+
     if( (cmd_line->sid_msg_file) &&
 	(config_file->sid_msg_file))
     {
