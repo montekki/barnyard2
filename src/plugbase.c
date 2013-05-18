@@ -68,7 +68,7 @@
 #include "output-plugins/spo_alert_test.h"
 #include "output-plugins/spo_alert_prelude.h"
 #include "output-plugins/spo_alert_unixsock.h"
-#include "output-plugins/spo_database.h"
+#include "output-plugins/spo_database_legacy.h"
 #include "output-plugins/spo_log_ascii.h"
 #include "output-plugins/spo_log_null.h"
 #include "output-plugins/spo_log_tcpdump.h"

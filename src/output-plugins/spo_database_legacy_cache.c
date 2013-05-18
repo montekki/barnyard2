@@ -29,8 +29,8 @@
  *
  */
 
-#include "output-plugins/spo_database.h"
-#include "output-plugins/spo_database_cache.h"
+#include "output-plugins/spo_database_legacy.h"
+#include "output-plugins/spo_database_legacy_cache.h"
 
 
 /* LOOKUP FUNCTIONS */
