@@ -59,7 +59,7 @@ static const char* FATAL_NO_SENSOR_2 =
     " continue to get this error. You can contact me at (roman@danyliw.com).\n";
 
 static const char* FATAL_BAD_SCHEMA_1 =
-    "database: The underlying database has not been initialized correctly.  This\n"
+    "database_legacy: The underlying database has not been initialized correctly.  This\n"
     "          version of barnyard2 requires version %d of the DB schema.  Your DB\n"
     "          doesn't appear to have any records in the 'schema' table.\n%s";
 
@@ -71,7 +71,7 @@ static const char* FATAL_BAD_SCHEMA_2 =
     "          and the URL to the most recent database plugin documentation.\n";
 
 static const char* FATAL_OLD_SCHEMA_1 =
-    "database: The underlying database seems to be running an older version of\n"
+    "database_legacy: The underlying database seems to be running an older version of\n"
     "          the DB schema (current version=%d, required minimum version= %d).\n\n"
     "          If you have an existing database with events logged by a previous\n"
     "          version of barnyard2, this database must first be upgraded to the latest\n"
@@ -100,7 +100,7 @@ static const char* FATAL_NO_SUPPORT_2 =
     "and the URL to the most recent database plugin documentation.\n";
 
 
-#include "output-plugins/spo_database.h"
+#include "output-plugins/spo_database_legacy.h"
 
 void DatabaseCleanSelect(DatabaseData *data)
 {
@@ -287,7 +287,7 @@ void DatabaseSetup(void)
        the preproc list */
 
     /* CHECKME: -elz I think it should also support OUTPUT_TYPE_FLAG__LOG.. */
-    RegisterOutputPlugin("database", OUTPUT_TYPE_FLAG__ALERT, DatabaseInit);
+    RegisterOutputPlugin("database_legacy", OUTPUT_TYPE_FLAG__ALERT, DatabaseInit);
 
     DEBUG_WRAP(DebugMessage(DEBUG_INIT, "database(debug): database plugin is registered...\n"););
 }
@@ -336,7 +336,7 @@ u_int32_t SynchronizeEventId(DatabaseData *data)
 			 table_array[itr],
 			 data->sid))
 	{
-	    LogMessage("database: [%s()], was unable to build query \n",
+	    LogMessage("database_legacy: [%s()], was unable to build query \n",
 		       __FUNCTION__);
 	    return 1;
 	}
@@ -344,7 +344,7 @@ u_int32_t SynchronizeEventId(DatabaseData *data)
 	
 	if(Select(data->SQL_SELECT,data,(u_int32_t *)&c_cid))
 	{
-	    DEBUG_WRAP(DebugMessage(DB_DEBUG,"database: [%s()]: Problems executing [%s], (there is probably no row in the table for sensor id [%d] \n",
+	    DEBUG_WRAP(DebugMessage(DB_DEBUG,"database_legacy: [%s()]: Problems executing [%s], (there is probably no row in the table for sensor id [%d] \n",
 				    __FUNCTION__,
 				    data->SQL_SELECT,
 			            data->sid););
@@ -352,7 +352,7 @@ u_int32_t SynchronizeEventId(DatabaseData *data)
 	
 	if(c_cid > data->cid)
 	{
-	    DEBUG_WRAP(DebugMessage(DB_DEBUG,"INFO database: Table [%s] had a more recent cid [%u], using cid [%u] instead of [%u] \n",
+	    DEBUG_WRAP(DebugMessage(DB_DEBUG,"INFO database_legacy: Table [%s] had a more recent cid [%u], using cid [%u] instead of [%u] \n",
 				    table_array[itr],
 				    c_cid,
 				    c_cid,
@@ -378,7 +378,7 @@ u_int32_t SynchronizeEventId(DatabaseData *data)
 
     if(c_cid != data->cid)
     {
-	FatalError("database [%s()]: Something is wrong with the sensor table, you "
+	FatalError("database_legacy [%s()]: Something is wrong with the sensor table, you "
 		   "might have two process updating it...bailing\n",
 		   __FUNCTION__);
     }
@@ -400,121 +400,121 @@ void DatabasePluginPrintData(DatabaseData *data)
         /* These strings will not overflow the buffers */
 #ifdef ENABLE_MYSQL
         snprintf(database_support_buf, sizeof(database_support_buf),
-                 "database: compiled support for (%s)", KEYWORD_MYSQL);
+                 "database_legacy: compiled support for (%s)", KEYWORD_MYSQL);
         if (data->dbtype_id == DB_MYSQL)
 	    snprintf(database_in_use_buf, sizeof(database_in_use_buf),
-		     "database: configured to use %s", KEYWORD_MYSQL);
+		     "database_legacy: configured to use %s", KEYWORD_MYSQL);
 #endif
 #ifdef ENABLE_POSTGRESQL
         snprintf(database_support_buf, sizeof(database_support_buf),
-                 "database: compiled support for (%s)", KEYWORD_POSTGRESQL);
+                 "database_legacy: compiled support for (%s)", KEYWORD_POSTGRESQL);
         if (data->dbtype_id == DB_POSTGRESQL)
 	    snprintf(database_in_use_buf, sizeof(database_in_use_buf),
-		     "database: configured to use %s", KEYWORD_POSTGRESQL);
+		     "database_legacy: configured to use %s", KEYWORD_POSTGRESQL);
 #endif
 #ifdef ENABLE_ODBC
         snprintf(database_support_buf, sizeof(database_support_buf),
-                 "database: compiled support for (%s)", KEYWORD_ODBC);
+                 "database_legacy: compiled support for (%s)", KEYWORD_ODBC);
         if (data->dbtype_id == DB_ODBC)
 	    snprintf(database_in_use_buf, sizeof(database_in_use_buf),
-		     "database: configured to use %s", KEYWORD_ODBC);
+		     "database_legacy: configured to use %s", KEYWORD_ODBC);
 #endif
 #ifdef ENABLE_ORACLE
         snprintf(database_support_buf, sizeof(database_support_buf),
-                 "database: compiled support for (%s)", KEYWORD_ORACLE);
+                 "database_legacy: compiled support for (%s)", KEYWORD_ORACLE);
         if (data->dbtype_id == DB_ORACLE)
 	    snprintf(database_in_use_buf, sizeof(database_in_use_buf),
-		     "database: configured to use %s", KEYWORD_ORACLE);
+		     "database_legacy: configured to use %s", KEYWORD_ORACLE);
 #endif
 #ifdef ENABLE_MSSQL
         snprintf(database_support_buf, sizeof(database_support_buf),
-                 "database: compiled support for (%s)", KEYWORD_MSSQL);
+                 "database_legacy: compiled support for (%s)", KEYWORD_MSSQL);
         if (data->dbtype_id == DB_MSSQL)
 	    snprintf(database_in_use_buf, sizeof(database_in_use_buf),
-		     "database: configured to use %s", KEYWORD_MSSQL);
+		     "database_legacy: configured to use %s", KEYWORD_MSSQL);
 #endif
         LogMessage("%s\n", database_support_buf);
         LogMessage("%s\n", database_in_use_buf);
     }
     
-    LogMessage("database: schema version = %d\n", data->DBschema_version);
+    LogMessage("database_legacy: schema version = %d\n", data->DBschema_version);
     
     if (data->host != NULL)
-	LogMessage("database:           host = %s\n", data->host);
+	LogMessage("database_legacy:           host = %s\n", data->host);
     
     if (data->port != NULL)
-	LogMessage("database:           port = %s\n", data->port);
+	LogMessage("database_legacy:           port = %s\n", data->port);
     
     if (data->user != NULL)
-	LogMessage("database:           user = %s\n", data->user);
+	LogMessage("database_legacy:           user = %s\n", data->user);
     
     if (data->dbname != NULL)
-	LogMessage("database:  database name = %s\n", data->dbname);
+	LogMessage("database_legacy:  database name = %s\n", data->dbname);
     
     if (data->sensor_name != NULL)
-	LogMessage("database:    sensor name = %s\n", data->sensor_name);
+	LogMessage("database_legacy:    sensor name = %s\n", data->sensor_name);
     
     
-    LogMessage("database:      sensor id = %u\n", data->sid);
+    LogMessage("database_legacy:      sensor id = %u\n", data->sid);
     
-    LogMessage("database:     sensor cid = %u\n", data->cid);
+    LogMessage("database_legacy:     sensor cid = %u\n", data->cid);
     
     if (data->encoding == ENCODING_HEX)
     {
-	LogMessage("database:  data encoding = %s\n", KEYWORD_ENCODING_HEX);
+	LogMessage("database_legacy:  data encoding = %s\n", KEYWORD_ENCODING_HEX);
     }
     else if (data->encoding == ENCODING_BASE64)
     {
-	LogMessage("database:  data encoding = %s\n", KEYWORD_ENCODING_BASE64);
+	LogMessage("database_legacy:  data encoding = %s\n", KEYWORD_ENCODING_BASE64);
     }
     else
     {
-	LogMessage("database:  data encoding = %s\n", KEYWORD_ENCODING_ASCII);
+	LogMessage("database_legacy:  data encoding = %s\n", KEYWORD_ENCODING_ASCII);
     }
 
     if (data->detail == DETAIL_FULL)
     {
-	LogMessage("database:   detail level = %s\n", KEYWORD_DETAIL_FULL);
+	LogMessage("database_legacy:   detail level = %s\n", KEYWORD_DETAIL_FULL);
     }
     else
     {
-	LogMessage("database:   detail level = %s\n", KEYWORD_DETAIL_FAST);
+	LogMessage("database_legacy:   detail level = %s\n", KEYWORD_DETAIL_FAST);
     }
     
     if (data->ignore_bpf)
     {
-	LogMessage("database:     ignore_bpf = %s\n", KEYWORD_IGNOREBPF_YES);
+	LogMessage("database_legacy:     ignore_bpf = %s\n", KEYWORD_IGNOREBPF_YES);
     }
     else
     {
-	LogMessage("database:     ignore_bpf = %s\n", KEYWORD_IGNOREBPF_NO);
+	LogMessage("database_legacy:     ignore_bpf = %s\n", KEYWORD_IGNOREBPF_NO);
     }
     
 #ifdef ENABLE_MYSQL
     if (data->dbRH[data->dbtype_id].ssl_key != NULL)
-	LogMessage("database:        ssl_key = %s\n", data->dbRH[data->dbtype_id].ssl_key);
+	LogMessage("database_legacy:        ssl_key = %s\n", data->dbRH[data->dbtype_id].ssl_key);
 
     if (data->dbRH[data->dbtype_id].ssl_cert != NULL)
-	LogMessage("database:       ssl_cert = %s\n", data->dbRH[data->dbtype_id].ssl_cert);
+	LogMessage("database_legacy:       ssl_cert = %s\n", data->dbRH[data->dbtype_id].ssl_cert);
 
     if (data->dbRH[data->dbtype_id].ssl_ca != NULL)
-	LogMessage("database:         ssl_ca = %s\n", data->dbRH[data->dbtype_id].ssl_ca);
+	LogMessage("database_legacy:         ssl_ca = %s\n", data->dbRH[data->dbtype_id].ssl_ca);
 
     if (data->dbRH[data->dbtype_id].ssl_ca_path != NULL)
-	LogMessage("database:    ssl_ca_path = %s\n", data->dbRH[data->dbtype_id].ssl_ca_path);
+	LogMessage("database_legacy:    ssl_ca_path = %s\n", data->dbRH[data->dbtype_id].ssl_ca_path);
     
     if (data->dbRH[data->dbtype_id].ssl_cipher != NULL)
-	LogMessage("database:     ssl_cipher = %s\n", data->dbRH[data->dbtype_id].ssl_cipher);
+	LogMessage("database_legacy:     ssl_cipher = %s\n", data->dbRH[data->dbtype_id].ssl_cipher);
 #endif /* ENABLE_MYSQL */
     
 #ifdef ENABLE_POSTGRESQL
     if (data->dbRH[data->dbtype_id].ssl_mode != NULL)
-	LogMessage("database:       ssl_mode = %s\n", data->dbRH[data->dbtype_id].ssl_mode);
+	LogMessage("database_legacy:       ssl_mode = %s\n", data->dbRH[data->dbtype_id].ssl_mode);
 #endif /* ENABLE_POSTGRESQL */
     
     if(data->facility != NULL)
     {
-	LogMessage("database: using the \"%s\" facility\n",data->facility);
+	LogMessage("database_legacy: using the \"%s\" facility\n",data->facility);
     }
     
     return;
@@ -609,14 +609,14 @@ void DatabaseInit(char *args)
     if( (data->SQL_INSERT = malloc(data->SQL_INSERT_SIZE)) == NULL)
     {
 	/* XXX */
-	FatalError("database [%s()], unable to allocate SQL_INSERT memory, bailing \n",
+	FatalError("database_legacy [%s()], unable to allocate SQL_INSERT memory, bailing \n",
 		   __FUNCTION__);
     }
     
     if ( (data->SQL_SELECT = malloc(data->SQL_SELECT_SIZE)) == NULL)
     {
 	/* XXX */
-	FatalError("database [%s()], unable to allocate SQL_SELECT memory, bailing \n",
+	FatalError("database_legacy [%s()], unable to allocate SQL_SELECT memory, bailing \n",
 		   __FUNCTION__);
 	
     }
@@ -802,7 +802,7 @@ u_int32_t DatabasePluginInitializeSensor(DatabaseData *data)
          if( BeginTransaction(data) )
          {
 	       /* XXX */
-	       FatalError("database [%s()]: Failed to Initialize transaction, bailing ... \n",
+	       FatalError("database_legacy [%s()]: Failed to Initialize transaction, bailing ... \n",
 		   __FUNCTION__);
          }
 
@@ -816,7 +816,7 @@ u_int32_t DatabasePluginInitializeSensor(DatabaseData *data)
          if(CommitTransaction(data))
          {
 	     /* XXX */
-	     ErrorMessage("ERROR database: [%s()]: Error commiting transaction \n",
+	     ErrorMessage("ERROR database_legacy: [%s()]: Error commiting transaction \n",
 		     __FUNCTION__);
 	     
 	     setTransactionCallFail(&data->dbRH[data->dbtype_id]);
@@ -837,7 +837,7 @@ u_int32_t DatabasePluginInitializeSensor(DatabaseData *data)
 	
 	if(data->sid == 0)
 	{
-	    ErrorMessage("ERROR database: Problem obtaining SENSOR ID (sid) from %s->sensor\n",
+	    ErrorMessage("ERROR database_legacy: Problem obtaining SENSOR ID (sid) from %s->sensor\n",
 			 data->dbname);
 	    FatalError("%s\n%s\n", FATAL_NO_SENSOR_1, FATAL_NO_SENSOR_2);
 	}
@@ -882,7 +882,7 @@ void DatabaseInitFinalize(int unused, void *arg)
     if( (ConvertDefaultCache(barnyard2_conf,data)))
     {
 	/* XXX */
-	FatalError("database [%s()], ConvertDefaultCache() Failed \n",
+	FatalError("database_legacy [%s()], ConvertDefaultCache() Failed \n",
 		   __FUNCTION__);
     }
     
@@ -909,7 +909,7 @@ void DatabaseInitFinalize(int unused, void *arg)
     if(CacheSynchronize(data))
     {
 	/* XXX */
-	FatalError("database [%s()]: CacheSynchronize() call failed ...\n",
+	FatalError("database_legacy [%s()]: CacheSynchronize() call failed ...\n",
 		   __FUNCTION__);
 	return;
     }
@@ -941,7 +941,7 @@ DatabaseData *InitDatabaseData(char *args)
     
     if(args == NULL)
     {
-        ErrorMessage("ERROR database: you must supply arguments for database plugin\n");
+        ErrorMessage("ERROR database_legacy: you must supply arguments for database plugin\n");
         DatabasePrintUsage();
         FatalError("");
     }
@@ -971,7 +971,7 @@ void ParseDatabaseArgs(DatabaseData *data)
 
     if(data->args == NULL)
     {
-        ErrorMessage("ERROR database: you must supply arguments for database plugin\n");
+        ErrorMessage("ERROR database_legacy: you must supply arguments for database plugin\n");
         DatabasePrintUsage();
         FatalError("");
     }
@@ -992,14 +992,14 @@ void ParseDatabaseArgs(DatabaseData *data)
             data->facility = facility;
         else
         {
-            ErrorMessage("ERROR database: The first argument needs to be the logging facility\n");
+            ErrorMessage("ERROR database_legacy: The first argument needs to be the logging facility\n");
             DatabasePrintUsage();
             FatalError("");
         }
     }
     else
     {
-        ErrorMessage("ERROR database: Invalid format for first argment\n");
+        ErrorMessage("ERROR database_legacy: Invalid format for first argment\n");
         DatabasePrintUsage();
         FatalError("");
     }
@@ -1008,7 +1008,7 @@ void ParseDatabaseArgs(DatabaseData *data)
 
     if(type == NULL)
     {
-        ErrorMessage("ERROR database: you must enter the database type in configuration "
+        ErrorMessage("ERROR database_legacy: you must enter the database type in configuration "
                      "file as the second argument\n");
         DatabasePrintUsage();
         FatalError("");
@@ -1043,7 +1043,7 @@ void ParseDatabaseArgs(DatabaseData *data)
              !strncasecmp(type, KEYWORD_MSSQL, strlen(KEYWORD_MSSQL))  ||
              !strncasecmp(type, KEYWORD_ORACLE, strlen(KEYWORD_ORACLE)) )
         {
-            ErrorMessage("ERROR database: '%s' support is not compiled into this build of snort\n\n", type);
+            ErrorMessage("ERROR database_legacy: '%s' support is not compiled into this build of snort\n\n", type);
             FatalError(FATAL_NO_SUPPORT_1, type, type, type, FATAL_NO_SUPPORT_2);
         }
         else
@@ -1203,7 +1203,7 @@ void ParseDatabaseArgs(DatabaseData *data)
             }
             else
             {
-                ErrorMessage("ERROR database: unknown ssl_mode argument (%s)", a1);
+                ErrorMessage("ERROR database_legacy: unknown ssl_mode argument (%s)", a1);
             }
         }
 #endif
@@ -1216,32 +1216,32 @@ void ParseDatabaseArgs(DatabaseData *data)
 	/* Print Transaction Warning */
 	if(data->dbname == NULL)
 	{
-	    ErrorMessage("database: no DSN was specified, unable to try to initialize ODBC connection. (use [dbname] parameter, in configuration file to set DSN)\n");
+	    ErrorMessage("database_legacy: no DSN was specified, unable to try to initialize ODBC connection. (use [dbname] parameter, in configuration file to set DSN)\n");
 	    FatalError("");
 	}
 	else
 	{
-	    LogMessage("database: will use DSN [%s] for ODBC Connection setup \n",
+	    LogMessage("database_legacy: will use DSN [%s] for ODBC Connection setup \n",
 		       data->dbname);
 	}
 	
 	if(data->host != NULL)
 	{
-	    ErrorMessage("database: [host] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
+	    ErrorMessage("database_legacy: [host] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
 			 data->host,
 			 data->dbname);
 	}
 
 	if(data->user != NULL)
 	{
-	    ErrorMessage("database: [user] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
+	    ErrorMessage("database_legacy: [user] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
 			 data->user,
 			 data->dbname);
 	}
 	
 	if(data->port != NULL)
 	{
-	    ErrorMessage("database: [port] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
+	    ErrorMessage("database_legacy: [port] [%s] will not be used, we will use infromation from the DSN [%s], make sure your setup is ok. \n",
 			 data->port,
 			 data->dbname);
 	}
@@ -1250,13 +1250,13 @@ void ParseDatabaseArgs(DatabaseData *data)
     {
 	if(data->dbname == NULL)
 	{
-	    ErrorMessage("ERROR database: must enter database name in configuration file\n\n");
+	    ErrorMessage("ERROR database_legacy: must enter database name in configuration file\n\n");
 	    DatabasePrintUsage();
 	    FatalError("");
 	}
 	else if(data->host == NULL)
 	{
-	    ErrorMessage("ERROR database: must enter host in configuration file\n\n");
+	    ErrorMessage("ERROR database_legacy: must enter host in configuration file\n\n");
 	    DatabasePrintUsage();
 	    FatalError("");
 	}
@@ -1264,7 +1264,7 @@ void ParseDatabaseArgs(DatabaseData *data)
     
     if(data->dbRH[data->dbtype_id].dbConnectionLimit == 0)
     {
-	LogMessage("INFO database: Defaulting Reconnect/Transaction Error limit to 10 \n");
+	LogMessage("INFO database_legacy: Defaulting Reconnect/Transaction Error limit to 10 \n");
 	data->dbRH[data->dbtype_id].dbConnectionLimit = 10;
 	
 	/* Might make a different option for it but for now lets consider
@@ -1274,7 +1274,7 @@ void ParseDatabaseArgs(DatabaseData *data)
     
     if(data->dbRH[data->dbtype_id].dbReconnectSleepTime.tv_sec == 0)
     {
-	LogMessage("INFO database: Defaulting Reconnect sleep time to 5 second \n");
+	LogMessage("INFO database_legacy: Defaulting Reconnect sleep time to 5 second \n");
 	data->dbRH[data->dbtype_id].dbReconnectSleepTime.tv_sec = 5;
     }
     
@@ -1311,7 +1311,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
 		      iUpdateSig->obj.message))
     {
 	/* XXX */
-	LogMessage("ERROR database: calling SnortSnprintf() on data->SQL_SELECT in [%s()] \n",
+	LogMessage("ERROR database_legacy: calling SnortSnprintf() on data->SQL_SELECT in [%s()] \n",
 		   __FUNCTION__);
 	
 	return 1;
@@ -1329,7 +1329,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
 	{
 	    /* XXX */
 
-	    LogMessage("ERROR database: calling SnortSnprintf() on data->SQL_INSERT in [%s()] \n",
+	    LogMessage("ERROR database_legacy: calling SnortSnprintf() on data->SQL_INSERT in [%s()] \n",
 		       __FUNCTION__);
 	    
 	    return 1;
@@ -1347,7 +1347,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
 			  iUpdateSig->obj.message))
 	{
 	    /* XXX */
-	    LogMessage("ERROR database: calling SnortSnprintf() on data->SQL_INSERT in [%s()] \n",
+	    LogMessage("ERROR database_legacy: calling SnortSnprintf() on data->SQL_INSERT in [%s()] \n",
 		       __FUNCTION__);
 	    
 	    return 1;
@@ -1365,7 +1365,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
     if(Insert(data->SQL_INSERT,data,1))
     {
 	/* XXX */
-	LogMessage("ERROR database: calling Insert() in [%s()] \n",
+	LogMessage("ERROR database_legacy: calling Insert() in [%s()] \n",
 		   __FUNCTION__);
 	
         return 1;
@@ -1375,7 +1375,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
     if(Select(data->SQL_SELECT,data,(u_int32_t *)&db_sig_id))
     {
 	/* XXX */
-	LogMessage("ERROR database: calling Select() in [%s()] \n",
+	LogMessage("ERROR database_legacy: calling Select() in [%s()] \n",
 		   __FUNCTION__);
 	
         return 1;
@@ -1393,7 +1393,7 @@ u_int32_t dbSignatureInformationUpdate(DatabaseData *data,cacheSignatureObj *iUp
 	if(db_sig_id != iUpdateSig->obj.db_id)
 	{
 	    /* XXX */
-	    LogMessage("ERROR database: Returned signature_id [%u] is not equal to updated signature_id [%u] in [%s()] \n",
+	    LogMessage("ERROR database_legacy: Returned signature_id [%u] is not equal to updated signature_id [%u] in [%s()] \n",
 		       db_sig_id,
 		       iUpdateSig->obj.db_id,
 		       __FUNCTION__);
@@ -2442,13 +2442,13 @@ void Database(Packet *p, void *event, uint32_t event_type, void *arg)
     
     if(data == NULL)
     {
-	FatalError("database [%s()]: Called with a NULL DatabaseData Argument, can't process \n",
+	FatalError("database_legacy [%s()]: Called with a NULL DatabaseData Argument, can't process \n",
 		   __FUNCTION__);
     }
     
     if( event == NULL || p == NULL)
     {
-	LogMessage("WARNING database [%s()]: Called with Event[0x%x] Event Type [%u] (P)acket [0x%x], information has not been outputed. \n",
+	LogMessage("WARNING database_legacy [%s()]: Called with Event[0x%x] Event Type [%u] (P)acket [0x%x], information has not been outputed. \n",
 		   __FUNCTION__,
 		   event,
 		   event_type,
@@ -2513,7 +2513,7 @@ TransacRollback:
     if( BeginTransaction(data) )
     {
 	/* XXX */
-	FatalError("database [%s()]: Failed to Initialize transaction, bailing ... \n",
+	FatalError("database_legacy [%s()]: Failed to Initialize transaction, bailing ... \n",
 		   __FUNCTION__);
     }
     
@@ -2559,7 +2559,7 @@ TransacRollback:
     if(CommitTransaction(data))
     {
 	/* XXX */
-	ErrorMessage("ERROR database: [%s()]: Error commiting transaction \n",
+	ErrorMessage("ERROR database_legacy: [%s()]: Error commiting transaction \n",
 		     __FUNCTION__);
 	
 	setTransactionCallFail(&data->dbRH[data->dbtype_id]);
@@ -2584,7 +2584,7 @@ TransacRollback:
 bad_query:
     if( (SQLMaxQuery = SQL_GetMaxQuery(data)))
     {
-	LogMessage("WARNING database: [%s()] Failed transaction with current query transaction \n ",
+	LogMessage("WARNING database_legacy: [%s()] Failed transaction with current query transaction \n ",
 		   __FUNCTION__);
 	
         itr = 0;
@@ -2594,16 +2594,16 @@ bad_query:
             if( (CurrentQuery = SQL_GetQueryByPos(data,itr)) == NULL)
             {
                 /* XXX */
-		FatalError("database [%s()]: Failed to execute SQL_GetQueryByPos() in bad_query state, exiting \n",
+		FatalError("database_legacy [%s()]: Failed to execute SQL_GetQueryByPos() in bad_query state, exiting \n",
 			   __FUNCTION__);
             }
 	    
-	    LogMessage("WARNING database: Failed Query Position [%d] Failed Query Body [%s] \n",
+	    LogMessage("WARNING database_legacy: Failed Query Position [%d] Failed Query Body [%s] \n",
 		       itr+1,
 		       CurrentQuery);
         }
 	
-	LogMessage("WARNING database [%s()]: End of failed transaction block \n",
+	LogMessage("WARNING database_legacy [%s()]: End of failed transaction block \n",
 		   __FUNCTION__);
     }
     
@@ -2802,7 +2802,7 @@ u_int32_t snort_escape_string_STATIC(char *from, u_int32_t buffer_max_len ,Datab
 	(buffer_max_len == 0))
     {
 	/* XXX */
-	FatalError("database [%s()]: Edit source code and change the value of the #define  DATABASE_MAX_ESCAPE_STATIC_BUFFER_LEN in spo_database.h to something greater than [%u] \n",
+	FatalError("database_legacy [%s()]: Edit source code and change the value of the #define  DATABASE_MAX_ESCAPE_STATIC_BUFFER_LEN in spo_database.h to something greater than [%u] \n",
 		   __FUNCTION__,
 		   buffer_max_len);
     }
@@ -3017,7 +3017,7 @@ int UpdateLastCid(DatabaseData *data, int sid, int cid)
     if( BeginTransaction(data) )
     {
         /* XXX */
-        FatalError("database [%s()]: Failed to Initialize transaction, bailing ... \n",
+        FatalError("database_legacy [%s()]: Failed to Initialize transaction, bailing ... \n",
                    __FUNCTION__);
     }
     
@@ -3040,7 +3040,7 @@ int UpdateLastCid(DatabaseData *data, int sid, int cid)
     if(CommitTransaction(data))
     {
         /* XXX */
-        ErrorMessage("ERROR database: [%s()]: Error commiting transaction \n",
+        ErrorMessage("ERROR database_legacy: [%s()]: Error commiting transaction \n",
                      __FUNCTION__);
 	
         setTransactionCallFail(&data->dbRH[data->dbtype_id]);
@@ -3089,7 +3089,7 @@ int GetLastCid(DatabaseData *data, int sid,u_int32_t *r_cid)
     if( Select(data->SQL_SELECT,data,(u_int32_t *)r_cid))
     {
 	/* XXX */
-        ErrorMessage("ERROR database: executing Select() with Query [%s] \n",data->SQL_SELECT);
+        ErrorMessage("ERROR database_legacy: executing Select() with Query [%s] \n",data->SQL_SELECT);
 	*r_cid = 0;
 	
 	return 1;
@@ -3163,7 +3163,7 @@ int CheckDBVersion(DatabaseData * data)
    if( Select(data->SQL_SELECT,data,(u_int32_t *)&data->DBschema_version))
    {
        /* XXX */
-       ErrorMessage("ERROR database: executing Select() with Query [%s] \n",data->SQL_SELECT);
+       ErrorMessage("ERROR database_legacy: executing Select() with Query [%s] \n",data->SQL_SELECT);
        return 1;
    }
    
@@ -3195,7 +3195,7 @@ u_int32_t BeginTransaction(DatabaseData * data)
     if(data == NULL)
     {
 	/* XXX */
-	FatalError("database [%s()], Invoked with NULL DatabaseData \n",
+	FatalError("database_legacy [%s()], Invoked with NULL DatabaseData \n",
 		   __FUNCTION__);
     }
 
@@ -3270,7 +3270,7 @@ u_int32_t  CommitTransaction(DatabaseData * data)
     if(data == NULL)
     {
         /* XXX */
-        FatalError("database [%s()], Invoked with NULL DatabaseData \n",
+        FatalError("database_legacy [%s()], Invoked with NULL DatabaseData \n",
                    __FUNCTION__);
     }
     
@@ -3348,7 +3348,7 @@ u_int32_t RollbackTransaction(DatabaseData * data)
     if(data == NULL)
     {
         /* XXX */
-        FatalError("database [%s()], Invoked with NULL DatabaseData \n",
+        FatalError("database_legacy [%s()], Invoked with NULL DatabaseData \n",
                    __FUNCTION__);
     }
 
@@ -3486,7 +3486,7 @@ int Insert(char * query, DatabaseData * data,u_int32_t inTransac)
         {
             if(PQerrorMessage(data->p_connection)[0] != '\0')
             {
-                ErrorMessage("ERROR database: database: postgresql_error: %s\n",
+                ErrorMessage("ERROR database_legacy: database_legacy: postgresql_error: %s\n",
                              PQerrorMessage(data->p_connection));
 		return 1;
             }
@@ -3626,7 +3626,7 @@ int Insert(char * query, DatabaseData * data,u_int32_t inTransac)
                       , data->o_errormsg
                       , sizeof(data->o_errormsg)
                       , OCI_HTYPE_ERROR);
-            ErrorMessage("ERROR database: database: oracle_error: %s\n", data->o_errormsg);
+            ErrorMessage("ERROR database_legacy: database_legacy: oracle_error: %s\n", data->o_errormsg);
             ErrorMessage("        : query: %s\n", query);
         }
     }
@@ -3677,7 +3677,7 @@ int Select(char * query, DatabaseData * data,u_int32_t *rval)
 	(rval == NULL))
     {
 	/* XXX */
-	FatalError("database [%s()] Invoked with a NULL argument Query [0x%x] Data [0x%x] rval [0x%x] \n",
+	FatalError("database_legacy [%s()] Invoked with a NULL argument Query [0x%x] Data [0x%x] rval [0x%x] \n",
 		   __FUNCTION__,
 		   query,
 		   data,
@@ -3713,7 +3713,7 @@ Select_reconnect:
             {
                 if((PQntuples(data->p_result)) > 1)
                 {
-                    ErrorMessage("ERROR database: Query [%s] returned more than one result\n",
+                    ErrorMessage("ERROR database_legacy: Query [%s] returned more than one result\n",
                                  query);
                     result = 0;
 		    PQclear(data->p_result);
@@ -3737,7 +3737,7 @@ Select_reconnect:
         {
             if(PQerrorMessage(data->p_connection)[0] != '\0')
             {
-                ErrorMessage("ERROR database: postgresql_error: %s\n",
+                ErrorMessage("ERROR database_legacy: postgresql_error: %s\n",
                              PQerrorMessage(data->p_connection));
 		return 1;
             }
@@ -3845,7 +3845,7 @@ Select_reconnect:
                             if(data->u_rows > 1)
                             {
 				SQLFreeHandle(SQL_HANDLE_STMT,data->u_statement);
-                                ErrorMessage("ERROR database: Query [%s] returned more than one result\n", query);
+                                ErrorMessage("ERROR database_legacy: Query [%s] returned more than one result\n", query);
                                 result = 0;
 				return 1;
                             }
@@ -3929,7 +3929,7 @@ Select_reconnect:
                       , data->o_errormsg
                       , sizeof(data->o_errormsg)
                       , OCI_HTYPE_ERROR);
-            ErrorMessage("ERROR database: database: oracle_error: %s\n", data->o_errormsg);
+            ErrorMessage("ERROR database_legacy: database_legacy: oracle_error: %s\n", data->o_errormsg);
             ErrorMessage("        : query: %s\n", query);
         }
 	
@@ -3956,7 +3956,7 @@ Select_reconnect:
 #endif
 	
     default:
-	FatalError("database [%s()]: Invoked with unknown database type [%u] \n",
+	FatalError("database_legacy [%s()]: Invoked with unknown database type [%u] \n",
 		   __FUNCTION__,
 		   data->dbtype_id);
     }
@@ -3982,7 +3982,7 @@ void Connect(DatabaseData * data)
     if(data == NULL)
     {
 	/* XXX */
-	FatalError("database [%s()]: Invoked with NULL DatabaseData argument \n",
+	FatalError("database_legacy [%s()]: Invoked with NULL DatabaseData argument \n",
 		   __FUNCTION__);
     }
     
@@ -4086,7 +4086,7 @@ void Connect(DatabaseData * data)
 	    /* XXX */
 	    mysql_close(data->m_sock);
 	    data->m_sock = NULL;
-	    LogMessage("WARNING database: unable to unset autocommit\n");
+	    LogMessage("WARNING database_legacy: unable to unset autocommit\n");
 	    return;
 	}
 
@@ -4196,26 +4196,26 @@ void Connect(DatabaseData * data)
      { \
          OCIErrorGet(data->o_error, 1, NULL, &data->o_errorcode, \
                      data->o_errormsg, sizeof(data->o_errormsg), OCI_HTYPE_ERROR); \
-         ErrorMessage("ERROR database: Oracle_error: %s\n", data->o_errormsg); \
+         ErrorMessage("ERROR database_legacy: Oracle_error: %s\n", data->o_errormsg); \
          FatalError("database  %s : Connection to database '%s' failed\n", \
                     func_name, data->dbRH[data->dbtype_id]->dbname); \
      }
     
     if (!getenv("ORACLE_HOME"))
       {
-         ErrorMessage("ERROR database: ORACLE_HOME environment variable not set\n");
+         ErrorMessage("ERROR database_legacy: ORACLE_HOME environment variable not set\n");
       }
 
       if (!data->user || !data->password || !data->dbRH[data->dbtype_id]->dbname)
       {
-         ErrorMessage("ERROR database: user, password and dbname required for Oracle\n");
-         ErrorMessage("ERROR database: dbname must also be in tnsnames.ora\n");
+         ErrorMessage("ERROR database_legacy: user, password and dbname required for Oracle\n");
+         ErrorMessage("ERROR database_legacy: dbname must also be in tnsnames.ora\n");
       }
 
       if (data->host)
       {
-         ErrorMessage("ERROR database: hostname not required for Oracle, use dbname\n");
-         ErrorMessage("ERROR database: dbname  must be in tnsnames.ora\n");
+         ErrorMessage("ERROR database_legacy: hostname not required for Oracle, use dbname\n");
+         ErrorMessage("ERROR database_legacy: dbname  must be in tnsnames.ora\n");
       }
 
       if (OCIInitialize(OCI_DEFAULT, NULL, NULL, NULL, NULL))
@@ -4235,10 +4235,10 @@ void Connect(DatabaseData * data)
                    data->dbRH[data->dbtype_id]->dbname, strlen(data->dbRH[data->dbtype_id]->dbname)))
       {
          OCIErrorGet(data->o_error, 1, NULL, &data->o_errorcode, data->o_errormsg, sizeof(data->o_errormsg), OCI_HTYPE_ERROR);
-         ErrorMessage("ERROR database: oracle_error: %s\n", data->o_errormsg);
-         ErrorMessage("ERROR database: Checklist: check database is listed in tnsnames.ora\n");
-         ErrorMessage("ERROR database:            check tnsnames.ora readable\n");
-         ErrorMessage("ERROR database:            check database accessible with sqlplus\n");
+         ErrorMessage("ERROR database_legacy: oracle_error: %s\n", data->o_errormsg);
+         ErrorMessage("ERROR database_legacy: Checklist: check database is listed in tnsnames.ora\n");
+         ErrorMessage("ERROR database_legacy:            check tnsnames.ora readable\n");
+         ErrorMessage("ERROR database_legacy:            check database accessible with sqlplus\n");
          FatalError("database OCILogon : Connection to database '%s' failed\n", data->dbRH[data->dbtype_id]->dbname);
       }
 
@@ -4289,7 +4289,7 @@ void Connect(DatabaseData * data)
 #endif
 	
     default:
-	FatalError("database [%s()]: Invoked with unknown database type [%u] \n",
+	FatalError("database_legacy [%s()]: Invoked with unknown database type [%u] \n",
 		   __FUNCTION__,
 		   data->dbtype_id);
 	
@@ -4315,13 +4315,13 @@ void Disconnect(DatabaseData * data)
 
     if(data == NULL)
     {
-	FatalError("database [%s()]: Invoked with NULL data \n",
+	FatalError("database_legacy [%s()]: Invoked with NULL data \n",
 		   __FUNCTION__);
     }
     
     
     
-    LogMessage("database: Closing connection to database \"%s\"\n",
+    LogMessage("database_legacy: Closing connection to database \"%s\"\n",
                data->dbname);
     
     switch(data->dbtype_id)
@@ -4410,7 +4410,7 @@ void Disconnect(DatabaseData * data)
 #endif
 	    
     default:
-	FatalError("database [%s()]: Invoked with unknown database type [%u] \n",
+	FatalError("database_legacy [%s()]: Invoked with unknown database type [%u] \n",
                    __FUNCTION__,
                    data->dbtype_id);
 	break;
@@ -4425,7 +4425,7 @@ void DatabasePrintUsage(void)
 {
     puts("\nUSAGE: database plugin\n");
 
-    puts(" output database: [log | alert], [type of database], [parameter list]\n");
+    puts(" output database_legacy: [log | alert], [type of database], [parameter list]\n");
     puts(" [log | alert] selects whether the plugin will use the alert or");
     puts(" log facility.\n");
 
@@ -4466,7 +4466,7 @@ void DatabasePrintUsage(void)
     puts(" privileges on the \"snort\" database and does not require a password.");
     puts(" The following line enables snort to log to this database.\n");
 
-    puts(" output database: log, mysql, dbname=snort user=snortusr host=localhost\n");
+    puts(" output database_legacy: log, mysql, dbname=snort user=snortusr host=localhost\n");
 }
 
 
@@ -4483,7 +4483,7 @@ void SpoDatabaseCleanExitFunction(int signal, void *arg)
 	{
 	    if( RollbackTransaction(data))
 	    {
-		DEBUG_WRAP(DebugMessage(DB_DEBUG,"database: RollbackTransaction failed in [%s()] \n",
+		DEBUG_WRAP(DebugMessage(DB_DEBUG,"database_legacy: RollbackTransaction failed in [%s()] \n",
 					__FUNCTION__));
 	    }
 	    
@@ -4562,15 +4562,15 @@ static int mssql_err_handler(PDBPROCESS dbproc, int severity, int dberr, int ose
                              LPCSTR dberrstr, LPCSTR oserrstr)
 {
     int retval;
-    ErrorMessage("ERROR database: DB-Library error:\n\t%s\n", dberrstr);
+    ErrorMessage("ERROR database_legacy: DB-Library error:\n\t%s\n", dberrstr);
 
     if ( severity == EXCOMM && (oserr != DBNOERR || oserrstr) )
-        ErrorMessage("ERROR database: Net-Lib error %d:  %s\n", oserr, oserrstr);
+        ErrorMessage("ERROR database_legacy: Net-Lib error %d:  %s\n", oserr, oserrstr);
     if ( oserr != DBNOERR )
-        ErrorMessage("ERROR database: Operating-system error:\n\t%s\n", oserrstr);
+        ErrorMessage("ERROR database_legacy: Operating-system error:\n\t%s\n", oserrstr);
 #ifdef ENABLE_MSSQL_DEBUG
     if( strlen(g_CurrentStatement) > 0 )
-        ErrorMessage("ERROR database:  The above error was caused by the following statement:\n%s\n", g_CurrentStatement);
+        ErrorMessage("ERROR database_legacy:  The above error was caused by the following statement:\n%s\n", g_CurrentStatement);
 #endif
     if ( (dbproc == NULL) || DBDEAD(dbproc) )
         retval = INT_EXIT;
@@ -4583,7 +4583,7 @@ static int mssql_err_handler(PDBPROCESS dbproc, int severity, int dberr, int ose
 static int mssql_msg_handler(PDBPROCESS dbproc, DBINT msgno, int msgstate, int severity,
                              LPCSTR msgtext, LPCSTR srvname, LPCSTR procname, DBUSMALLINT line)
 {
-    ErrorMessage("ERROR database: SQL Server message %ld, state %d, severity %d: \n\t%s\n",
+    ErrorMessage("ERROR database_legacy: SQL Server message %ld, state %d, severity %d: \n\t%s\n",
                  msgno, msgstate, severity, msgtext);
     if ( (srvname!=NULL) && strlen(srvname)!=0 )
         ErrorMessage("Server '%s', ", srvname);
@@ -4594,7 +4594,7 @@ static int mssql_msg_handler(PDBPROCESS dbproc, DBINT msgno, int msgstate, int s
     ErrorMessage("\n");
 #ifdef ENABLE_MSSQL_DEBUG
     if( strlen(g_CurrentStatement) > 0 )
-        ErrorMessage("ERROR database:  The above error was caused by the following statement:\n%s\n", g_CurrentStatement);
+        ErrorMessage("ERROR database_legacy:  The above error was caused by the following statement:\n%s\n", g_CurrentStatement);
 #endif
 
     return(0);
@@ -4628,7 +4628,7 @@ void resetTransactionState(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     pdbRH->checkTransaction = 0;
@@ -4645,7 +4645,7 @@ void setTransactionState(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     pdbRH->checkTransaction = 1;
@@ -4658,7 +4658,7 @@ void setTransactionCallFail(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     if(pdbRH->checkTransaction)
@@ -4676,7 +4676,7 @@ u_int32_t getReconnectState(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     return  pdbRH->dbReconnectedInTransaction;
@@ -4688,7 +4688,7 @@ void setReconnectState(dbReliabilityHandle *pdbRH,u_int32_t reconnection_state)
     if(pdbRH == NULL)
     {
         /* XXX */
-	FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+	FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     pdbRH->dbReconnectedInTransaction = reconnection_state;
@@ -4701,7 +4701,7 @@ u_int32_t checkTransactionState(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     return pdbRH->checkTransaction;
@@ -4713,7 +4713,7 @@ u_int32_t checkTransactionCall(dbReliabilityHandle *pdbRH)
     if(pdbRH == NULL)
     {
         /* XXX */
-        FatalError("database [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
+        FatalError("database_legacy [%s()] called with a null dbReliabilityHandle",__FUNCTION__);
     }
     
     if(checkTransactionState(pdbRH))
@@ -4795,9 +4795,9 @@ u_int32_t MYSQL_ManualConnect(DatabaseData *dbdata)
 			  dbdata->port == NULL ? 0 : atoi(dbdata->port), NULL, 0) == NULL)
     {
 	if(mysql_errno(dbdata->m_sock))
-	    LogMessage("database: mysql_error: %s\n", mysql_error(dbdata->m_sock));
+	    LogMessage("database_legacy: mysql_error: %s\n", mysql_error(dbdata->m_sock));
 	
-	LogMessage("database: Failed to logon to database '%s'\n", dbdata->dbname);
+	LogMessage("database_legacy: Failed to logon to database '%s'\n", dbdata->dbname);
 	
 	mysql_close(dbdata->m_sock);
 	dbdata->m_sock = NULL;
@@ -4817,7 +4817,7 @@ u_int32_t MYSQL_ManualConnect(DatabaseData *dbdata)
     /* We are in manual connect mode */
     if (mysql_options(dbdata->m_sock, MYSQL_OPT_RECONNECT, &dbdata->dbRH[dbdata->dbtype_id].mysql_reconnect) != 0)
     {
-	LogMessage("database: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
+	LogMessage("database_legacy: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
 	mysql_close(dbdata->m_sock);
 	dbdata->m_sock = NULL;
 	return 1;
@@ -4871,7 +4871,7 @@ MYSQL_RetryConnection:
 		if( dbReconnectSetCounters(pdbRH))
 		{
 		    /* XXX */
-		    FatalError("database [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
+		    FatalError("database_legacy [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
 		}
 		
 		if(checkTransactionState(pdbRH))
@@ -4897,7 +4897,7 @@ MYSQL_RetryConnection:
 				  MYSQL_OPT_RECONNECT, 
 				  &pdbRH->mysql_reconnect) != 0)
 		{
-		    LogMessage("database: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
+		    LogMessage("database_legacy: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
 		    return 1;
 		}
 		
@@ -4928,7 +4928,7 @@ MYSQL_RetryConnection:
 				  MYSQL_OPT_RECONNECT,
 				  &pdbRH->mysql_reconnect) != 0)
 		{
-		    LogMessage("database: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
+		    LogMessage("database_legacy: Failed to set reconnect option: %s\n", mysql_error(dbdata->m_sock));
 		    return 1;
 		}
 		return 0;
@@ -4951,7 +4951,7 @@ MYSQL_RetryConnection:
 	    if( dbReconnectSetCounters(pdbRH))
 	    {
 		/* XXX */
-		FatalError("database [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
+		FatalError("database_legacy [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
 	    }
 	    
 	    goto MYSQL_RetryConnection;
@@ -4989,7 +4989,7 @@ MYSQL_RetryConnection:
 	    if(dbReconnectSetCounters(pdbRH))
 	    {
 		/* XXX */
-		FatalError("database [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
+		FatalError("database_legacy [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
 	    }
 	    
 	    if((MYSQL_ManualConnect(pdbRH->dbdata)))
@@ -5192,7 +5192,7 @@ conn_test:
 	    if(dbReconnectSetCounters(pdbRH))
 	    {
 		/* XXX */
-		FatalError("database [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
+		FatalError("database_legacy [%s()]: Call failed, the process will need to be restarted \n",__FUNCTION__);
 	    }
 
 	    /* Changed PQreset by call to PQfinish and PQdbLogin */
@@ -5306,7 +5306,7 @@ void ODBCPrintError(DatabaseData *data,SQLSMALLINT iHandleType)
 	break;
 	
     default:
-	LogMessage("Database [%s()]: Unknown statement type [%u] \n",
+	LogMessage("database_legacy [%s()]: Unknown statement type [%u] \n",
 		   __FUNCTION__,
 		   iHandleType);
 	return;
@@ -5328,7 +5328,7 @@ void ODBCPrintError(DatabaseData *data,SQLSMALLINT iHandleType)
 		     errorIndex,
 		     msg);
 		     
-	DEBUG_WRAP(LogMessage("database: %s\n", msg););
+	DEBUG_WRAP(LogMessage("database_legacy: %s\n", msg););
 	errorIndex++;
     }
 

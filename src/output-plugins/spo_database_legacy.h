@@ -56,7 +56,7 @@
 #include "unified2.h"
 #include "util.h"
 
-#include "output-plugins/spo_database_cache.h"
+#include "output-plugins/spo_database_legacy_cache.h"
 
 
 #define DB_DEBUG 0x80000000

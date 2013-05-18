@@ -22,7 +22,7 @@ spo_log_tcpdump.c spo_log_tcpdump.h \
 spo_sguil.c spo_sguil.h \
 spo_echidna.c spo_echidna.h \
 spo_syslog_full.c spo_syslog.full.h \
-spo_database.c spo_database.h \
-spo_database_cache.c spo_database_cache.h
+spo_database_legacy.c spo_database_legacy.h \
+spo_database_legacy_cache.c spo_database_legacy_cache.h
 
 INCLUDES = -I.. -I ../sfutil
