@@ -15,6 +15,7 @@ spo_alert_prelude.c spo_alert_prelude.h \
 spo_alert_syslog.c spo_alert_syslog.h \
 spo_alert_test.c spo_alert_test.h \
 spo_alert_unixsock.c spo_alert_unixsock.h \
+spo_alert_zmq.c spo_alert_zmq.h \
 spo_common.c spo_common.h \
 spo_log_ascii.c spo_log_ascii.h \
 spo_log_null.c spo_log_null.h \

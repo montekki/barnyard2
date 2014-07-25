@@ -26,11 +26,13 @@ strlcpyu.c strlcpyu.h \
 timersub.h \
 twofish.c twofish.h \
 unified2.h \
-util.c util.h
+util.c util.h \
+sensor_cache.c sensor_cache.h
 
 barnyard2_LDADD = output-plugins/libspo.a \
 input-plugins/libspi.a \
-sfutil/libsfutil.a
+sfutil/libsfutil.a -lpthread -lczmq -lzmq -lsodium
+
 
 SUBDIRS = sfutil output-plugins input-plugins
 

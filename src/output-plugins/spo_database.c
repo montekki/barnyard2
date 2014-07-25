@@ -42,6 +42,9 @@
    chunks with lengths < 509 to keep ISO C89 compilers happy
  */
 
+#include "zmq_spooler.h"
+#include "sensor_cache.h"
+
 static const char* FATAL_NO_SENSOR_1 =
     " When this plugin starts, a SELECT query is run to find the sensor id for the\n"
     " currently running sensor. If the sensor id is not found, the plugin will run\n"
@@ -300,6 +303,70 @@ void DatabaseSetup(void)
 #ifndef DB_TABLE_NAME_LEN
 #define DB_TABLE_NAME_LEN 20
 #endif /* DB_TABLE_NAME_LEN */
+
+u_int32_t SyncEventId(DatabaseData *data, u_int32_t *cid, u_int32_t sid)
+{
+    if (data == NULL)
+        return -1;
+
+    u_int32_t c_cid = 0;
+    u_int32_t num_tables = 7;
+    u_int32_t itr = 0;
+
+    char table_array[DB_CHECK_TABLES][DB_TABLE_NAME_LEN] = {"data","event","icmphdr","iphdr","opt","tcphdr","udphdr"};
+
+    if (GetLastCid(data, sid, cid)) {
+        return 1;
+    }
+
+    for (itr = 0; itr < num_tables; itr++) {
+        c_cid = 0;
+        DatabaseCleanSelect (data);
+        if (SnortSnprintf(data->SQL_SELECT, data->SQL_SELECT_SIZE,
+                    "SELECT MAX(cid) FROM %s WHERE sid='%u';",
+                    table_array[itr], sid))
+        {
+            LogMessage("database: [%s()], was unable to build query\n",
+                    __FUNCTION__);
+            return 1;
+        }
+
+        if (Select(data->SQL_SELECT, data, &c_cid)) {
+            DEBUG_WRAP(DebugMessage(DB_DEBUG, "database: [%s()]: Problems executing [%s] (there is probably no row in table for sensor id [%d] \n",
+                        __FUNCTION__,
+                        data->SQL_SELECT,
+                        sid););
+        }
+
+        if (c_cid >= *cid) {
+            printf ("cidcid %d %d\n", c_cid, *cid);
+            DEBUG_WRAP(DebugMessage(DB_DEBUG, "INFO database: Table [%s] had a more recent cid [%u], using cid [%u] instead of [%u] \n",
+                        table_array[itr],
+                        c_cid,
+                        c_cid,
+                        *cid););
+
+            *cid = c_cid + 1;
+        }
+    }
+
+
+    if (UpdateLastCid(data, sid, *cid) < 0) {
+        FatalError("database Unable to construct query - output  error or tuncation\n");
+    }
+
+    if (GetLastCid(data, sid, &c_cid)) {
+        return 1;
+    }
+
+    if (c_cid != *cid) {
+        FatalError("database [%s()]: Something is wrong with the sensor table,"
+                "you might have two process updating it...bailing\n",
+                __FUNCTION__);
+    }
+
+    return 0;
+}
 
 /* 
  * Since it is possible that an error occured and that we could have an event_id out of sync
@@ -627,6 +694,117 @@ void DatabaseInit(char *args)
 
     
     return;
+}
+
+u_int32_t DatabaseAddSensor(void *info, DatabaseData *data)
+{
+    u_int32_t cid;
+    u_int32_t retval = 0;
+    ZMQEventMessage *message = (ZMQEventMessage*) info;
+    char *escapedSensorName = NULL;
+    char *escapedInterfaceName = NULL;
+    char *escapedBPFFilter = NULL;
+
+    if (!data || !info) {
+        return 1;
+    }
+
+    if (message->add_info.info.sensor_name[0]) {
+        escapedSensorName = snort_escape_string (message->add_info.info.sensor_name, data);
+    } else {
+        escapedSensorName = strdup ("NULL");
+    }
+
+    if (message->add_info.info.interface[0]) {
+        escapedInterfaceName = snort_escape_string (message->add_info.info.interface, data);
+    } else {
+	escapedInterfaceName = strdup ("NULL");
+    }
+
+    DatabaseCleanInsert (data);
+
+    if ((SnortSnprintf (data->SQL_INSERT, data->SQL_INSERT_SIZE,
+                    "INSERT INTO sensor (hostname, interface, detail, encoding, last_cid) "
+                    "VALUES ('%s', '%s', %u, %u, 0);",
+                    escapedSensorName, escapedInterfaceName,
+                    data->detail, data->encoding)) != SNORT_SNPRINTF_SUCCESS)
+    {
+        retval = 1;
+        goto exit_funct;
+    }
+
+    DatabaseCleanSelect (data);
+    if ((SnortSnprintf (data->SQL_SELECT, data->SQL_SELECT_SIZE,
+                    "SELECT sid"
+                    " FROM sensor "
+                    " WHERE hostname = '%s' "
+                    " AND interface = '%s' "
+                    " AND detail = %u "
+                    " AND encoding = %u "
+                    " AND filter IS NULL",
+                    escapedSensorName, escapedInterfaceName,
+                    data->detail, data->encoding)) != SNORT_SNPRINTF_SUCCESS)
+    {
+        retval = 1;
+        goto exit_funct;
+    }
+
+    Select (data->SQL_SELECT, data, (u_int32_t *)&data->sid);
+
+    if (data->sid == 0) {
+        if (BeginTransaction (data)) {
+            FatalError ("database [%s()]: Failed to init transaction\n", __FUNCTION__);
+        }
+
+        if (Insert (data->SQL_INSERT, data, 1)) {
+            FatalError ("database Error inserting [%s] \n", data->SQL_INSERT);
+        }
+
+        if (CommitTransaction (data)) {
+            ErrorMessage ("ERROR database: [%s()]: Error commiting transaction\n", __FUNCTION__);
+
+            setTransactionCallFail (&data->dbRH[data->dbtype_id]);
+            retval = 1;
+            goto exit_funct;
+        } else {
+            resetTransactionState (&data->dbRH[data->dbtype_id]);
+        }
+
+        if (Select (data->SQL_SELECT, data, (u_int32_t*)&data->sid))
+        {
+            FatalError ("database error executing [%s] \n", data->SQL_SELECT);
+        }
+
+        if (data->sid == 0) {
+            ErrorMessage ("Error database: problem obtaining sensor "
+                    "id (sid) from %s->sensor\n" , data->dbname);
+            FatalError ("%s\n%s\n", FATAL_NO_SENSOR_1, FATAL_NO_SENSOR_2);
+        }
+    }
+
+    retval = SyncEventId (data, &cid, data->sid);
+
+    if (retval) {
+        ErrorMessage ("ERROR database: Failed to sync event id for %u\n", data->sid);
+        goto exit_funct;
+    }
+
+    AddSensorInfo (&message->add_info.info, data->sid, cid);
+
+exit_funct:
+    if (escapedSensorName) {
+        free (escapedSensorName);
+    }
+
+    if (escapedInterfaceName) {
+        free (escapedInterfaceName);
+    }
+
+    if (escapedBPFFilter) {
+        free (escapedBPFFilter);
+    }
+
+    return retval;
 }
 
 u_int32_t DatabasePluginInitializeSensor(DatabaseData *data)
@@ -1843,6 +2021,9 @@ int dbProcessEventInformation(DatabaseData *data,Packet *p,
 	break;
     }
     
+    if (GetSensorCid(data->sid))
+        data->cid = GetSensorCid(data->sid);
+
     switch(data->dbtype_id)
     {
 	
@@ -2432,20 +2613,26 @@ bad_query:
  ******************************************************************************/
 void Database(Packet *p, void *event, uint32_t event_type, void *arg)
 {
-    DatabaseData *data = (DatabaseData *)arg;
-
-    char *CurrentQuery = NULL;
-
+    int ret;
     u_int32_t sig_id = 0;
     u_int32_t itr = 0;
     u_int32_t SQLMaxQuery = 0;
-    
+    char *CurrentQuery = NULL;
+    DatabaseData *data = (DatabaseData *)arg;
+
     if(data == NULL)
     {
 	FatalError("database [%s()]: Called with a NULL DatabaseData Argument, can't process \n",
 		   __FUNCTION__);
     }
     
+    if (event_type == UNIFIED2_SENSOR_INFO) {
+	    u_int32_t ret;
+	    ret = DatabaseAddSensor (event, data);
+	    printf ("%u\n", ret);
+	    return;
+    }
+
     if( event == NULL || p == NULL)
     {
 	LogMessage("WARNING database [%s()]: Called with Event[0x%x] Event Type [%u] (P)acket [0x%x], information has not been outputed. \n",
@@ -2475,7 +2662,15 @@ void Database(Packet *p, void *event, uint32_t event_type, void *arg)
     event_id = ntohl(((Unified2EventCommon *)event)->event_id);
     event_second = ntohl(((Unified2EventCommon *)event)->event_second);
     event_microsecond =  ntohl(((Unified2EventCommon *)event)->event_microsecond);
-    
+
+    if (((Unified2EventCommon *)event)->sensor_id) {
+        data->sid = ntohl (((Unified2EventCommon *)event)->sensor_id);
+        printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
+        ret = SyncEventId (data, (u_int32_t*)&data->cid, data->sid);
+        printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
+        //data->cid = GetSensorCid(data->sid);
+    }
+
     if( (gid == 1) &&
 	(revision == 0))
     {
@@ -2576,6 +2771,9 @@ TransacRollback:
     
     /* Increment the cid*/
     data->cid++;
+    if (((Unified2EventCommon *)event)->sensor_id) {
+        UpdateSensorCid(data->sid, data->cid);
+    }
     //LogMessage("Inserted a new event \n");
     /* Normal Exit Path */
 

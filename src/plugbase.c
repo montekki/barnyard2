@@ -55,6 +55,7 @@
 
 /* built-in input plugins */
 #include "input-plugins/spi_unified2.h"
+#include "input-plugins/spi_zmq.h"
 
 /* built-in output plugins */
 #include "output-plugins/spo_alert_arubaaction.h"
@@ -68,6 +69,7 @@
 #include "output-plugins/spo_alert_test.h"
 #include "output-plugins/spo_alert_prelude.h"
 #include "output-plugins/spo_alert_unixsock.h"
+#include "output-plugins/spo_alert_zmq.h"
 #include "output-plugins/spo_database.h"
 #include "output-plugins/spo_log_ascii.h"
 #include "output-plugins/spo_log_null.h"
@@ -98,6 +100,7 @@ InputFuncNode *InputList;
 void RegisterInputPlugins()
 {
     LogMessage("Initializing Input Plugins!\n");
+    ZMQSetup();
     Unified2Setup();
 }
 
@@ -334,6 +337,7 @@ void RegisterOutputPlugins(void)
 
     DatabaseSetup();
     AlertFastSetup();
+    AlertZMQSetup();
     AlertFullSetup();
     AlertFWsamSetup();
 #ifndef WIN32

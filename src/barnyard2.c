@@ -44,6 +44,8 @@
 #include <signal.h>
 #include <sys/stat.h>
 
+#include "zmq_spooler.h"
+
 #ifndef WIN32
 #include <netdb.h>
 #endif
@@ -87,6 +89,7 @@
 #include "mstring.h"
 #include "strlcpyu.h"
 #include "output-plugins/spo_log_tcpdump.h"
+#include "sensor_cache.h"
 
 #ifdef HAVE_LIBPRELUDE
 # include "output-plugins/spo_alert_prelude.h"
@@ -1085,6 +1088,8 @@ static void Barnyard2Cleanup(int exit_val,int exit_needed)
     /* This function can be called more than once. */
     static int already_exiting = 0;
     
+    FreeSensorCache();
+
     if( already_exiting != 0 )
     {
         return;
@@ -1965,8 +1970,8 @@ static void Barnyard2Init(int argc, char **argv)
     {
         /* Every run mode except version will potentially need output
          * If output plugins should become dynamic, this needs to move */
-        RegisterInputPlugins();
         RegisterOutputPlugins();
+        RegisterInputPlugins();
     }
 
     /* if we're using the rules system, it gets initialized here */
@@ -2108,7 +2113,12 @@ static void Barnyard2PostInit(void)
         LogMessage("Barnyard2 initialization completed successfully (pid=%u)\n",getpid());
     }
     
+    InitSensorCache();
+
     barnyard2_initializing = 0;
+    if (zmq_loop ()) {
+        exit_signal = 15;
+    }
 }
 
 #if defined(NOCOREFILE) && !defined(WIN32)

@@ -84,8 +84,8 @@ void DebugWideMessageFunc(int dbg,wchar_t *fmt, ...);
          #define __inline__ __inline
 #endif
 
-#endif /* DEBUG */
 
+#endif /* DEBUG */
 
 #ifdef DEBUG
 #define DEBUG_WRAP(code) code
