@@ -1,0 +1,4 @@
+check process barnyard2 with pidfile /var/run/barnyard2_p7p1.pid
+  start program = "/usr/sbin/service barnyard2 start"
+  stop program = "/usr/sbin/service barnyard2 stop"
+  if 5 restarts within 5 cycles then timeout
