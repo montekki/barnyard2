@@ -268,6 +268,29 @@ static int ZMQReconnect(zmq_conn_t *connection)
     return ret;
 }
 
+static void ZMQCleanup(zmq_conn_t *conn)
+{
+    if (conn->socket) {
+        if (conn->serverendpoint) {
+            zsock_disconnect (conn->socket, "%s", conn->serverendpoint);
+        }
+        zsock_destroy (&conn->socket);
+    }
+
+    free (conn->mycertpath);
+    free (conn->servercertpath);
+    free (conn->serverendpoint);
+    free (conn->sensor_name);
+
+    if (conn->mycert) {
+        zcert_destroy (&conn->mycert);
+    }
+
+    if (conn->servercert) {
+        zcert_destroy (&conn->servercert);
+    }
+}
+
 static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
 {
     char *a;
@@ -337,13 +360,16 @@ static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
             if (ZMQReconnect(connection) < 0) {
                 ErrorMessage ("Failed to reconnect to server %s\n",
                         connection->serverendpoint);
-                if (i == 2)
+                if (i == 2) {
+                    ZMQCleanup (connection);
                     FatalError("Exiting...\n");
+                }
             } else {
                 ret = zmq_sendmsg (connection->socket, &msg, 0);
                 if (ret < 0) {
                     ErrorMessage ("Failed to send message to server %s %d\n",
                             connection->serverendpoint, errno);
+                    ZMQCleanup (connection);
                     FatalError ("Exiting...\n");
                 }
             }
@@ -354,6 +380,7 @@ static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
 
     if (ret <= 0) {
         ErrorMessage ("Server is not responding...\n");
+        ZMQCleanup (connection);
         FatalError ("Exiting...\n");
     }
 
@@ -361,6 +388,7 @@ static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
 
     if (strcmp (a, "OK")) {
         ErrorMessage ("alert_zmq: Received an unexpected reply from the server: %s\n", a);
+        ZMQCleanup (connection);
         FatalError ("Exiting...");
     }
 
@@ -373,26 +401,7 @@ static void AlertZMQCleanup(int signal, void *arg, const char *msg)
 
     DEBUG_WRAP(DebugMessage(DEBUG_LOG, "%s", msg););
 
-    if (&conn->socket) {
-        if (conn->serverendpoint) {
-            zsock_disconnect (conn->socket, "%s", conn->serverendpoint);
-        }
-        zsock_wait (conn->socket);
-        zsock_destroy (&conn->socket);
-    }
-
-    free (conn->mycertpath);
-    free (conn->servercertpath);
-    free (conn->serverendpoint);
-    free (conn->sensor_name);
-
-    if (conn->mycert) {
-        zcert_destroy (&conn->mycert);
-    }
-
-    if (conn->servercert) {
-        zcert_destroy (&conn->servercert);
-    }
+    ZMQCleanup (conn);
 }
 
 static void AlertZMQCleanExitFunc(int signal, void *arg)
