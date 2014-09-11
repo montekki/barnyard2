@@ -349,6 +349,7 @@ static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
     message.tv_sec = p->pkth->ts.tv_sec;
     message.tv_usec = p->pkth->ts.tv_usec;
     message.event.sensor_id = htonl (connection->sid);
+    message.linktype = htonl (p->linktype);
 
     memcpy (zmq_msg_data (&msg), &message, sizeof (message));
 

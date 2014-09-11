@@ -26,6 +26,7 @@ typedef struct _ZMQEventMessage {
     Unified2EventCommon event;
     uint32_t sid;
     uint32_t packetlen;
+    uint32_t linktype;
     uint32_t event_type;
     uint64_t tv_sec;
     uint64_t tv_usec;
