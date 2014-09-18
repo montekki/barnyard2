@@ -257,6 +257,7 @@ int DecodePacket(int linktype, Packet *p, const struct pcap_pkthdr *pkthdr, cons
 
         default:            /* oops, don't know how to handle this one */
             ErrorMessage("\nCannot handle data link type %d\n", linktype);
+	    return -1;
     }
 
     /* add linktype to this packet for per plugin tracking */

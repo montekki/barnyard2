@@ -179,8 +179,11 @@ int zmq_loop ()
         pkthdr.ts.tv_sec = message->tv_sec;
 	pkthdr.ts.tv_usec = message->tv_usec;
 
-        DecodePacket (ntohl (message->linktype), &p, &pkthdr, message->add_info.packet);
-        CallOutputPlugins (1, &p, &message->event, message->event_type);
+        ret = DecodePacket (ntohl (message->linktype), &p, &pkthdr, message->add_info.packet);
+
+        if (ret >= 0) {
+            CallOutputPlugins (1, &p, &message->event, message->event_type);
+        }
 
         zmq_msg_close (&msg);
         zstr_send (connection->socket, "OK");
