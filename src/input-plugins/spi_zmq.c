@@ -119,6 +119,7 @@ int zmq_loop ()
     int ret;
     Packet p;
     u_int32_t sid;
+    u_int8_t *payload;
     zmq_msg_t msg;
     ZMQEventMessage *message;
     struct pcap_pkthdr pkthdr;
@@ -147,7 +148,16 @@ int zmq_loop ()
         if (ret == -1)
             break;
 
+
+        payload = zmq_msg_data (&msg);
         message = zmq_msg_data (&msg);
+
+        if (message->type == UNIFIED2_SENSOR_STATS) {
+                CallOutputPlugins (1, 0, payload + sizeof (u_int32_t), message->type);
+                zmq_msg_close (&msg);
+                zstr_send (connection->socket, "OK");
+                continue;
+        }
 
         if (message->event_type == UNIFIED2_SENSOR_INFO ) {
             DEBUG_WRAP(DebugMessage(DEBUG_INIT, "zmq: arrived sensor with name %s\n",

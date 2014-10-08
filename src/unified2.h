@@ -45,6 +45,7 @@
 #define UNIFIED2_IDS_EVENT_IPV6_VLAN 105
 #define UNIFIED2_EXTRA_DATA          110
 #define UNIFIED2_SENSOR_INFO         666
+#define UNIFIED2_SENSOR_STATS        667
 
 /* Each unified2 record will start out with one of these */
 typedef struct _Unified2RecordHeader

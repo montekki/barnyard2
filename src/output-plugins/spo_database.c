@@ -44,6 +44,7 @@
 
 #include "zmq_spooler.h"
 #include "sensor_cache.h"
+#include "sensor_stats.h"
 
 static const char* FATAL_NO_SENSOR_1 =
     " When this plugin starts, a SELECT query is run to find the sensor id for the\n"
@@ -807,9 +808,211 @@ exit_funct:
     return retval;
 }
 
+u_int32_t DatabaseAddSensorStats(void *info, DatabaseData *data)
+{
+	size_t i;
+	char sensName[64];
+	char valuebuf[64];
+	char statsRequest[1024] = {0};
+	char *escapedSensorName = NULL;
+	u_int32_t retval = 0, cid, sid;
+	u_int64_t *stats = (u_int64_t*)info;
+
+	strncpy (sensName, (char*)(info + 64*8), 50);
+	sensName[50] = '\0';
+
+	escapedSensorName = snort_escape_string (sensName, data);
+
+	DatabaseCleanSelect (data);
+
+	if ((SnortSnprintf (data->SQL_SELECT, data->SQL_SELECT_SIZE,
+		"SELECT sid"
+		" FROM sensor "
+		" WHERE hostname = '%s'",
+		escapedSensorName)) != SNORT_SNPRINTF_SUCCESS)
+	{
+		retval = 1;
+		goto exit_funct;
+	}
+
+	Select (data->SQL_SELECT, data, (u_int32_t *)&sid);
+
+	if (sid == 0) {
+		ErrorMessage ("Did not find sensor %s in database\n", sensName);
+		retval = 1;
+		goto exit_funct;
+	}
+
+	printf ("sid %d sensorname %s\n", sid, sensName);
+
+	DatabaseCleanInsert (data);
+
+
+	snprintf (statsRequest, sizeof (statsRequest), "INSERT INTO sensor_stats "
+		"(sid, kern_packets, kernel_drops, cpu_percent, vmem_used,"
+		"vmem_free, swap_used, swap_free, eth0_recv, eth0_drop,"
+		"eth1_recv, eth1_drop, mon0_recv, mon0_drop,"
+		"mon1_recv, mon1_drop, mon2_recv, mon2_drop,"
+		"mon3_recv, mon3_drop, mon4_recv, mon4_drop,"
+		"mon5_recv, mon5_drop, mon6_recv, mon6_drop,"
+		"mon7_recv, mon7_drop"
+		") VALUES (%u,", sid);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[KERNEL_PACKETS]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[KERNEL_DROPS]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[CPU_PERCENT]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[VMEM_USED]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[VMEM_FREE]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[SWAP_USED]);
+	strcat (statsRequest, valuebuf);
+
+	snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[SWAP_FREE]);
+	strcat (statsRequest, valuebuf);
+
+	if (stats[ETH0_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[ETH0_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[ETH0_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[ETH1_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[ETH1_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[ETH1_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON0_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON0_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON0_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON1_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON1_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON1_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON2_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON2_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON2_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON3_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON3_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON3_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON4_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON4_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON4_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON5_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON5_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON5_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON6_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON6_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON6_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL,");
+	}
+
+	if (stats[MON7_RECV]) {
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON7_RECV]);
+		strcat (statsRequest, valuebuf);
+		snprintf (valuebuf, sizeof (valuebuf), "%ld,", stats[MON7_DROP]);
+		strcat (statsRequest, valuebuf);
+	} else {
+		strcat (statsRequest, "NULL, NULL");
+	}
+
+	strcat (statsRequest, ")");
+
+	printf ("Request: %s\n", statsRequest);
+
+	DatabaseCleanInsert (data);
+	if ((SnortSnprintf (data->SQL_INSERT, data->SQL_INSERT_SIZE,
+		"%s;", statsRequest)) != SNORT_SNPRINTF_SUCCESS)
+	{
+		retval = 1;
+		goto exit_funct;
+	}
+
+	if (BeginTransaction (data)) {
+		FatalError ("database [%s()]: Failed to init transaction\n",
+		__FUNCTION__);
+		retval = 1;
+		goto exit_funct;
+	}
+
+	if (Insert (data->SQL_INSERT, data, 1)) {
+		FatalError ("database [%s()]: Error inserting [%s]\n",
+			__FUNCTION__, data->SQL_SELECT);
+		retval = 1;
+		goto exit_funct;
+	}
+
+	if (CommitTransaction (data)) {
+		ErrorMessage ("database [%s()]: Error committing transaction\n",
+		__FUNCTION__);
+		retval = 1;
+		goto exit_funct;
+	} else {
+		resetTransactionState (&data->dbRH[data->dbtype_id]);
+	}
+
+exit_funct:
+
+	free (escapedSensorName);
+
+	return retval;
+}
+
 u_int32_t DatabasePluginInitializeSensor(DatabaseData *data)
 {
-
     u_int32_t retval = 0;
     char * escapedSensorName = NULL;
     char * escapedInterfaceName = NULL;
@@ -2630,6 +2833,11 @@ void Database(Packet *p, void *event, uint32_t event_type, void *arg)
 	    u_int32_t ret;
 	    ret = DatabaseAddSensor (event, data);
 	    printf ("%u\n", ret);
+	    return;
+    } else if (event_type == UNIFIED2_SENSOR_STATS) {
+	    u_int32_t ret;
+	    ret = DatabaseAddSensorStats (event, data);
+	    printf ("result of DatabaseAddSensorStats: %u\n", ret);
 	    return;
     }
 
