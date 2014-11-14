@@ -250,7 +250,12 @@ static int ZMQReconnect(zmq_conn_t *connection)
 {
     int ret = 0;
 
-    zsock_destroy (&connection->socket);
+    if (connection->socket) {
+        if (connection->serverendpoint) {
+            zsock_disconnect (connection->socket, "%s", connection->serverendpoint);
+        }
+        zsock_destroy (&connection->socket);
+    }
 
     connection->socket = zsock_new (ZMQ_REQ);
     zcert_apply (connection->mycert, zsock_resolve (connection->socket));
