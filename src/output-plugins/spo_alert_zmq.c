@@ -25,6 +25,7 @@
 #include <strings.h>
 #endif
 
+#include <stdlib.h>
 #include <sys/types.h>
 
 #include <czmq.h>
@@ -38,6 +39,7 @@
 
 #define REQUEST_TIMEOUT		2500
 #define REQUEST_RETRIES		3
+#define MAX_HOSTNAME_LEN	128
 
 typedef struct zmq_conn {
     char	*mycertpath;
@@ -145,8 +147,12 @@ static void AlertZMQInit(char *args)
     }
 
     if (!connection->sensor_name) {
-        ErrorMessage ("alert_zmq: sensor_name is not specified!");
-        goto out_error;
+        connection->sensor_name = (char*)malloc(sizeof(char) * MAX_HOSTNAME_LEN);
+        if (gethostname(connection->sensor_name, MAX_HOSTNAME_LEN)) {
+            free (connection->sensor_name);
+            ErrorMessage ("alert_zmq: Failed to get my hostname!");
+            goto out_error;
+        }
     }
 
     connection->mycert = zcert_load (connection->mycertpath);
