@@ -310,6 +310,9 @@ static void AlertZMQ(Packet *p, void *event, uint32_t event_type, void *arg)
     zmq_conn_t *connection = (zmq_conn_t*)arg;
     ZMQEventMessage message;
 
+    if (!p || !event || !arg)
+	    return;
+
     memset (&message, 0, sizeof (message));
 
     rc = zmq_msg_init_size (&msg, sizeof (ZMQEventMessage));
