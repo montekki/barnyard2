@@ -328,47 +328,47 @@ void RegisterOutputPlugins(void)
 {
     LogMessage("Initializing Output Plugins!\n");
     
-    AlertCEFSetup();
-    AlertSyslogSetup();
+    //AlertCEFSetup();
+    //AlertSyslogSetup();
 
 #ifdef HAVE_LIBPCAP
-    LogTcpdumpSetup();
+    //LogTcpdumpSetup();
 #endif /* HAVE_LIBPCAP */
 
     DatabaseSetup();
-    AlertFastSetup();
+    //AlertFastSetup();
     AlertZMQSetup();
-    AlertFullSetup();
-    AlertFWsamSetup();
+    //AlertFullSetup();
+    //AlertFWsamSetup();
 #ifndef WIN32
     /* Win32 doesn't support AF_UNIX sockets */
-    AlertUnixSockSetup();
+    //AlertUnixSockSetup();
 #endif /* !WIN32 */
-    AlertCSVSetup();
-    LogNullSetup();
-    LogAsciiSetup();
+    //AlertCSVSetup();
+    //LogNullSetup();
+    //LogAsciiSetup();
 
 #ifdef ARUBA
-    AlertArubaActionSetup();
+    //AlertArubaActionSetup();
 #endif
 
 #ifdef HAVE_LIBPRELUDE
-    AlertPreludeSetup();
+    //AlertPreludeSetup();
 #endif
 
 #ifdef BROCCOLI
-    AlertBroSetup();
+    //AlertBroSetup();
 #endif
 
-    AlertTestSetup();
+    ///AlertTestSetup();
 
 #ifdef ENABLE_PLUGIN_ECHIDNA
-    EchidnaSetup();
+    //EchidnaSetup();
 #endif
 
-    SguilSetup();
+    //SguilSetup();
 
-    OpSyslog_Setup();
+    //OpSyslog_Setup();
 
 }
 
@@ -677,11 +677,13 @@ void CallOutputPlugins(OutputType out_type, Packet *packet, void *event, uint32_
     OutputFuncNode *idx = NULL;
 
     /* Plug for sid suppression */
+    /*
     if(event)
     {
 	if(pbCheckSignatureSuppression(event))
 	    return;
     }
+    */
 
 
     if (out_type == OUTPUT_TYPE__SPECIAL)
