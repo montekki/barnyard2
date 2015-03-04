@@ -340,7 +340,7 @@ u_int32_t SyncEventId(DatabaseData *data, u_int32_t *cid, u_int32_t sid)
         }
 
         if (c_cid >= *cid) {
-            printf ("cidcid %d %d\n", c_cid, *cid);
+            //printf ("cidcid %d %d\n", c_cid, *cid);
             DEBUG_WRAP(DebugMessage(DB_DEBUG, "INFO database: Table [%s] had a more recent cid [%u], using cid [%u] instead of [%u] \n",
                         table_array[itr],
                         c_cid,
@@ -843,7 +843,7 @@ u_int32_t DatabaseAddSensorStats(void *info, DatabaseData *data)
 		goto exit_funct;
 	}
 
-	printf ("sid %d sensorname %s\n", sid, sensName);
+//	printf ("sid %d sensorname %s\n", sid, sensName);
 
 	DatabaseCleanInsert (data);
 
@@ -971,7 +971,7 @@ u_int32_t DatabaseAddSensorStats(void *info, DatabaseData *data)
 
 	strcat (statsRequest, ")");
 
-	printf ("Request: %s\n", statsRequest);
+//	printf ("Request: %s\n", statsRequest);
 
 	DatabaseCleanInsert (data);
 	if ((SnortSnprintf (data->SQL_INSERT, data->SQL_INSERT_SIZE,
@@ -2832,12 +2832,12 @@ void Database(Packet *p, void *event, uint32_t event_type, void *arg)
     if (event_type == UNIFIED2_SENSOR_INFO) {
 	    u_int32_t ret;
 	    ret = DatabaseAddSensor (event, data);
-	    printf ("%u\n", ret);
+	    //printf ("%u\n", ret);
 	    return;
     } else if (event_type == UNIFIED2_SENSOR_STATS) {
 	    u_int32_t ret;
 	    ret = DatabaseAddSensorStats (event, data);
-	    printf ("result of DatabaseAddSensorStats: %u\n", ret);
+	    //printf ("result of DatabaseAddSensorStats: %u\n", ret);
 	    return;
     }
 
@@ -2873,9 +2873,9 @@ void Database(Packet *p, void *event, uint32_t event_type, void *arg)
 
     if (((Unified2EventCommon *)event)->sensor_id) {
         data->sid = ntohl (((Unified2EventCommon *)event)->sensor_id);
-        printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
+        //printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
         ret = SyncEventId (data, (u_int32_t*)&data->cid, data->sid);
-        printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
+        //printf ("data cid %d sid %d %d\n", data->cid, data->sid, ret);
         //data->cid = GetSensorCid(data->sid);
     }
 
