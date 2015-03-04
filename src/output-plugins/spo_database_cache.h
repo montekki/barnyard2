@@ -131,14 +131,21 @@
     "(sig_priority = '%u') AND "					\
     "(sig_name = '%s'); "						\
 
+#define SQL_SELECT_SPECIFIC_SIGNATURE_WITHOUT_CLASS "SELECT sig_id FROM signature WHERE " \
+    "(sig_sid  = '%u') AND "						\
+    "(sig_gid  = '%u') AND "						\
+    "(sig_rev  = '%u') AND "						\
+    "(sig_priority = '%u') AND "					\
+    "(sig_name = '%s'); "						\
 
 /* Used for backward compatibility with older barnyard process */
 #define SQL_SELECT_SPECIFIC_SIGNATURE_WITHOUT_MESSAGE "SELECT sig_id FROM signature WHERE " \
     "(sig_sid  = '%u') AND "                                            \
     "(sig_gid  = '%u') AND "                                            \
     "(sig_rev  = '%u') AND "                                            \
-    "(sig_class_id = '%u') AND "                                        \
     "(sig_priority = '%u');"						\
+//    "(sig_class_id = '%u') AND "                                        \
+
 /* Used for backward compatibility with older barnyard process */
 
 

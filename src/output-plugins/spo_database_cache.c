@@ -2036,7 +2036,7 @@ u_int32_t SignatureLookupDatabase(DatabaseData *data,dbSignatureObj *sObj)
 		       sObj->sid,
 		       sObj->gid,
 		       sObj->rev,
-		       sObj->class_id,
+		       //sObj->class_id,
 		       sObj->priority_id)) !=  SNORT_SNPRINTF_SUCCESS)
     {
 	/* XXX */
